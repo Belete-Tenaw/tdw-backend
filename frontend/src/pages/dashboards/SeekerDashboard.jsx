@@ -9,9 +9,19 @@ import RankProgress from '../../components/RankProgress';
 import TrustScorecard from '../../components/TrustScorecard';
 import Skeleton, { CardSkeleton } from '../../components/Skeleton';
 import { useToast } from '../../components/Toast';
-import { FileText } from 'lucide-react';
+import { FileText, Mic } from 'lucide-react';
 import DigitalContractViewer from '../../components/DigitalContractViewer';
 import EscrowTracker from '../../components/EscrowTracker';
+import VoiceAssistantModal from '../../components/VoiceAssistantModal';
+import SOSFloatingButton from '../../components/SOSFloatingButton';
+import SkillBadgeCard from '../../components/SkillBadgeCard';
+import ShiftTrackerModal from '../../components/ShiftTrackerModal';
+import DigitalContractSignModal from '../../components/DigitalContractSignModal';
+import VoiceInterviewCopilotModal from '../../components/VoiceInterviewCopilotModal';
+import PayrollPayoutModal from '../../components/PayrollPayoutModal';
+import GuarantorVerificationModal from '../../components/GuarantorVerificationModal';
+import HouseholdChecklistModal from '../../components/HouseholdChecklistModal';
+
 
 const SeekerDashboard = () => {
     const { t } = useTranslation();
@@ -30,6 +40,36 @@ const SeekerDashboard = () => {
     const [copied, setCopied] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterLocation, setFilterLocation] = useState('');
+    const [showVoiceModal, setShowVoiceModal] = useState(false);
+    const [showShiftModal, setShowShiftModal] = useState(false);
+    const [showContractSignModal, setShowContractSignModal] = useState(false);
+    const [showVoiceInterviewCopilot, setShowVoiceInterviewCopilot] = useState(false);
+    const [showPayrollPayoutModal, setShowPayrollPayoutModal] = useState(false);
+    const [showGuarantorModal, setShowGuarantorModal] = useState(false);
+    const [selectedContractForChecklist, setSelectedContractForChecklist] = useState(null);
+    const [showChecklistModal, setShowChecklistModal] = useState(false);
+
+
+    const handleVoiceRecorded = async (data) => {
+        try {
+            await api.post('/seekers/voice-bio', data);
+            addToast('Voice bio processed & saved successfully!', 'success');
+            const profileRes = await api.get(`/seekers/${user.id}`);
+            setUser(profileRes.data);
+        } catch (err) {
+            addToast('Failed to save voice bio', 'error');
+        }
+    };
+
+    const handleTakeQuiz = async (quizTitle) => {
+        try {
+            const res = await api.post('/seekers/verify-quiz', { quizId: quizTitle, score: 90 });
+            addToast(res.data.message || 'Badge unlocked!', 'success');
+            setUser(prev => ({ ...prev, rewardPoints: res.data.totalPoints }));
+        } catch (err) {
+            addToast('Quiz verification failed', 'error');
+        }
+    };
 
     const handleCopyCode = () => {
         if (user?.referralCode) {
@@ -157,9 +197,46 @@ const SeekerDashboard = () => {
                         </div>
 
                         <hr style={{ border: '0', borderTop: '1px solid #f1f5f9', margin: '24px 0' }} />
-                        <Link to="/profile/edit" className="btn-secondary" style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '12px', textDecoration: 'none', fontWeight: '700' }}>
+                        <Link to="/profile/edit" className="btn-secondary" style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '12px', textDecoration: 'none', fontWeight: '700', marginBottom: '10px' }}>
                             <FileText size={18} /> {t('settings') || 'Settings'}
                         </Link>
+                        <button 
+                            onClick={() => setShowVoiceModal(true)}
+                            className="btn-primary" 
+                            style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '12px', background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', border: 'none', color: 'white', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '0.9rem', marginBottom: '8px' }}
+                        >
+                            <Mic size={18} /> {t('voice_assistant') || 'Voice AI Assistant'}
+                        </button>
+                        <button 
+                            onClick={() => setShowShiftModal(true)}
+                            style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '12px', background: 'linear-gradient(135deg, #0d9488 0%, #059669 100%)', border: 'none', color: 'white', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '0.85rem', marginBottom: '8px' }}
+                        >
+                            ⏱️ Clock-In Shift Tracker
+                        </button>
+                        <button 
+                            onClick={() => setShowContractSignModal(true)}
+                            style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '12px', background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)', border: 'none', color: 'white', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '0.85rem', marginBottom: '8px' }}
+                        >
+                            ✍️ Digital E-Sign Contract
+                        </button>
+                        <button 
+                            onClick={() => setShowVoiceInterviewCopilot(true)}
+                            style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '12px', background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)', border: 'none', color: 'white', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '0.85rem', marginBottom: '8px' }}
+                        >
+                            🎙️ Voice Pre-Screening Copilot
+                        </button>
+                        <button 
+                            onClick={() => setShowPayrollPayoutModal(true)}
+                            style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '12px', background: 'linear-gradient(135deg, #059669 0%, #047857 100%)', border: 'none', color: 'white', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '0.85rem', marginBottom: '8px' }}
+                        >
+                            💸 Telebirr / CBE Birr Payout
+                        </button>
+                        <button 
+                            onClick={() => setShowGuarantorModal(true)}
+                            style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '12px', background: user?.isGuarantorVerified ? 'linear-gradient(135deg, #10b981 0%, #047857 100%)' : 'linear-gradient(135deg, #0284c7 0%, #1d4ed8 100%)', border: 'none', color: 'white', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '0.85rem' }}
+                        >
+                            🛡️ {user?.isGuarantorVerified ? (t('guarantor_verified_btn') || '✓ Guarantor Verified (ዋስ)') : (t('verify_guarantor_btn') || 'Verify Guarantor (+25 Pts)')}
+                        </button>
                     </div>
 
                     {/* Referral Card */}
@@ -227,8 +304,8 @@ const SeekerDashboard = () => {
                                         <BookOpen size={30} />
                                     </div>
                                     <div>
-                                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800' }}>EDWL Academy</h3>
-                                        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', opacity: 0.8 }}>Get certified and earn points</p>
+                                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800' }}>{t('edwl_academy_title') || 'EDWL Academy'}</h3>
+                                        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', opacity: 0.8 }}>{t('academy_sub') || 'Get certified and earn points'}</p>
                                     </div>
                                     <ChevronRight style={{ marginLeft: 'auto', opacity: 0.5 }} />
                                 </Link>
@@ -238,8 +315,8 @@ const SeekerDashboard = () => {
                                         <Video size={30} />
                                     </div>
                                     <div>
-                                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800' }}>Smart Interview</h3>
-                                        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', opacity: 0.8 }}>Record your pre-screening</p>
+                                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800' }}>{t('ai_smart_interview') || 'Smart Interview'}</h3>
+                                        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', opacity: 0.8 }}>{t('smart_interview_desc') || 'Record your pre-screening'}</p>
                                     </div>
                                     <ChevronRight style={{ marginLeft: 'auto', opacity: 0.5 }} />
                                 </Link>
@@ -248,7 +325,39 @@ const SeekerDashboard = () => {
                             {/* Rank Progress */}
                             <RankProgress user={user} />
 
+                            {/* Verified Skill Badges Grid */}
+                            <div style={{ marginBottom: '30px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800' }}>🎓 {t('skill_badges') || 'Skill Certification Badges'}</h3>
+                                    <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '600' }}>{t('earn_badges_boost_rank') || 'Earn badges to boost rank'}</span>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                                    <SkillBadgeCard 
+                                        title="Childcare & Infant Safety" 
+                                        category="Childcare" 
+                                        points={25} 
+                                        isEarned={(user?.rewardPoints || 0) >= 25} 
+                                        onTakeQuiz={() => handleTakeQuiz('Childcare & Infant Safety')} 
+                                    />
+                                    <SkillBadgeCard 
+                                        title="Ethiopian Culinary & Hygiene" 
+                                        category="Cooking" 
+                                        points={20} 
+                                        isEarned={(user?.rewardPoints || 0) >= 45} 
+                                        onTakeQuiz={() => handleTakeQuiz('Ethiopian Culinary & Hygiene')} 
+                                    />
+                                    <SkillBadgeCard 
+                                        title="Elder Care & First Aid" 
+                                        category="Elderly" 
+                                        points={30} 
+                                        isEarned={(user?.rewardPoints || 0) >= 75} 
+                                        onTakeQuiz={() => handleTakeQuiz('Elder Care & First Aid')} 
+                                    />
+                                </div>
+                            </div>
+
                             <div style={{ display: 'flex', gap: '15px', marginBottom: '24px', flexWrap: 'wrap' }}>
+
                                 <div style={{ position: 'relative', flex: 1, minWidth: '250px' }}>
                                     <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-light)' }} />
                                     <input
@@ -351,12 +460,35 @@ const SeekerDashboard = () => {
                                 </div>
                             ) : (
                                 contracts.map(contract => (
-                                    <DigitalContractViewer 
-                                        key={contract.id} 
-                                        contract={contract} 
-                                        userRole="seeker" 
-                                        onUpdate={() => window.location.reload()}
-                                    />
+                                    <div key={contract.id} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                        <DigitalContractViewer 
+                                            contract={contract} 
+                                            userRole="seeker" 
+                                            onUpdate={() => window.location.reload()}
+                                        />
+                                        <button
+                                            onClick={() => {
+                                                setSelectedContractForChecklist(contract.id);
+                                                setShowChecklistModal(true);
+                                            }}
+                                            style={{
+                                                padding: '10px 16px',
+                                                backgroundColor: '#0f766e',
+                                                color: '#ffffff',
+                                                border: 'none',
+                                                borderRadius: '10px',
+                                                fontWeight: '700',
+                                                fontSize: '0.85rem',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '8px'
+                                            }}
+                                        >
+                                            📦 {t('household_checklist_btn') || 'Household Handover Checklist'}
+                                        </button>
+                                    </div>
                                 ))
                             )}
                         </div>
@@ -389,6 +521,50 @@ const SeekerDashboard = () => {
                     onClose={() => setSelectedJob(null)}
                 />
             )}
+
+            <VoiceAssistantModal 
+                isOpen={showVoiceModal} 
+                onClose={() => setShowVoiceModal(false)} 
+                onVoiceRecorded={handleVoiceRecorded}
+            />
+
+            <ShiftTrackerModal
+                isOpen={showShiftModal}
+                onClose={() => setShowShiftModal(false)}
+            />
+
+            <DigitalContractSignModal
+                isOpen={showContractSignModal}
+                onClose={() => setShowContractSignModal(false)}
+            />
+
+            <VoiceInterviewCopilotModal
+                isOpen={showVoiceInterviewCopilot}
+                onClose={() => setShowVoiceInterviewCopilot(false)}
+            />
+
+            <PayrollPayoutModal
+                isOpen={showPayrollPayoutModal}
+                onClose={() => setShowPayrollPayoutModal(false)}
+            />
+
+            <GuarantorVerificationModal
+                isOpen={showGuarantorModal}
+                onClose={() => setShowGuarantorModal(false)}
+                onVerified={async () => {
+                    const res = await api.get(`/seekers/${user?.id}`);
+                    setUser(res.data);
+                }}
+            />
+
+            <HouseholdChecklistModal
+                isOpen={showChecklistModal}
+                onClose={() => setShowChecklistModal(false)}
+                contractId={selectedContractForChecklist}
+                userRole="JOB_SEEKER"
+            />
+
+            <SOSFloatingButton />
         </div>
     );
 };

@@ -92,12 +92,12 @@ const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'EDWL API',
-      version: '1.0.1',
-      description: 'API Documentation for Ethio Domestic Workers Link',
+      title: 'TDW API',
+      version: '1.0.2',
+      description: 'API Documentation for Trustworthy Domestic Workers (TDW)',
       contact: {
-        name: 'EDWL Support',
-        email: 'support@edwl.com'
+        name: 'TDW Support',
+        email: 'trustworthyaddis@gmail.com'
       }
     },
     servers: [
@@ -187,6 +187,22 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+// 🔐 STRICT AUTH RATE LIMIT (Brute-force Protection)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30, // Max 30 login/register attempts per 15 min window
+  message: { error: 'Too many authentication attempts. Please try again later after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/reset-password', authLimiter);
+
+// 🛡️ INPUT SANITIZATION
+const sanitizeInput = require('./middleware/sanitizer');
+app.use(sanitizeInput);
+
 // ================================
 // 📂 STATIC FILE SERVING
 // ================================
@@ -247,11 +263,19 @@ app.use('/api/contracts', require('./routes/contracts'));
 app.use('/api/escrow', require('./routes/escrow'));
 app.use('/api/upload', require('./routes/upload'));
 app.use('/api/seeker', require('./routes/academy'));
+app.use('/api/agency', require('./routes/agency'));
+app.use('/api/attendance', require('./routes/attendance'));
+app.use('/api/insurance', require('./routes/insurance'));
+app.use('/api/voice-copilot', require('./routes/voiceCopilot'));
+app.use('/api/payouts', require('./routes/payouts'));
+app.use('/api/guarantor', require('./routes/guarantor'));
+app.use('/api/household-checklist', require('./routes/householdChecklist'));
 
 // ================================
 // ❌ GLOBAL ERROR HANDLER
 // ================================
-app.use(require('./middleware/errorHandler'));
+const { errorHandler } = require('./middleware/errorHandler');
+app.use(errorHandler);
 
 // ================================
 // 🚀 SERVER START

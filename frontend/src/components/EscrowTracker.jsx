@@ -69,7 +69,7 @@ const EscrowTracker = ({ escrow, userRole, onUpdate }) => {
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', background: '#eff6ff', padding: '10px', borderRadius: '8px' }}>
                         <Info size={16} color="#3b82f6" style={{ flexShrink: 0, marginTop: '2px' }} />
                         <p style={{ fontSize: '0.75rem', color: '#1e40af', margin: 0 }}>
-                            Funds are safely held by EDWL. Release them only after the job is done.
+                            Funds are safely held by TDW. Release them only after the job is done.
                         </p>
                     </div>
                     <button 

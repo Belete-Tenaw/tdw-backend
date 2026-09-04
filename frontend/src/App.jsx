@@ -51,6 +51,7 @@ const RewardsDashboard = lazyWithRetry(() => import('./pages/RewardsDashboard'))
 const AcademyDashboard = lazyWithRetry(() => import('./pages/AcademyDashboard'));
 const SmartInterview = lazyWithRetry(() => import('./pages/SmartInterview'));
 const MarketingDashboard = lazyWithRetry(() => import('./pages/admin/MarketingDashboard'));
+const GuarantorConsentPage = lazyWithRetry(() => import('./pages/GuarantorConsentPage'));
 
 const Loading = () => (
     <div style={{
@@ -86,7 +87,7 @@ const Loading = () => (
                 fontWeight: '900',
                 color: 'var(--primary)',
                 letterSpacing: '1px'
-            }}>EDWL</div>
+            }}>TDW</div>
         </div>
         <p style={{ marginTop: '24px', fontWeight: '700', color: '#1e293b', fontSize: '1rem', letterSpacing: '0.05em' }}>
             SMART CONNECTING...
@@ -142,6 +143,7 @@ function App() {
                                             <SmartInterview />
                                         </ProtectedRoute>
                                     } />
+                                    <Route path="/guarantor-consent" element={<GuarantorConsentPage />} />
 
                                     <Route path="/messages" element={
                                         <ProtectedRoute allowedRoles={['JOB_SEEKER', 'EMPLOYER', 'ADMIN']}>

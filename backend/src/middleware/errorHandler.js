@@ -1,49 +1,76 @@
-const multer = require('multer');
+/**
+ * Centralized API Error Handling Middleware
+ * Handles operational errors, Prisma database exceptions, and unexpected failures.
+ */
+
+class AppError extends Error {
+    constructor(message, statusCode = 500, details = null) {
+        super(message);
+        this.statusCode = statusCode;
+        this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
+        this.isOperational = true;
+        this.details = details;
+
+        Error.captureStackTrace(this, this.constructor);
+    }
+}
 
 const errorHandler = (err, req, res, next) => {
-    console.error("Global Error Handler caught:", {
-        name: err.name,
-        message: err.message,
-        code: err.code,
-        stack: process.env.NODE_ENV === 'production' ? '🥞' : err.stack
-    });
+    err.statusCode = err.statusCode || 500;
+    err.status = err.status || 'error';
 
-    // Catch Multer errors specifically
-    if (err.name === 'MulterError' || err instanceof multer.MulterError) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({ error: 'File too large. Maximum size is 5MB for images and 15MB for videos.' });
-        }
-        return res.status(400).json({ error: `Upload error: ${err.message}` });
-    }
+    const isProd = process.env.NODE_ENV === 'production';
 
-    // Handle SyntaxError (JSON parsing errors)
-    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-        return res.status(400).json({ error: 'Bad JSON format' });
-    }
-
-    // Handle Prisma Errors
-    if (err.name === 'PrismaClientKnownRequestError') {
-        // P2002: Unique constraint violation
+    // Handle Prisma Specific Errors
+    if (err.code && err.code.startsWith('P')) {
+        let msg = 'Database constraint violation';
+        let code = 400;
         if (err.code === 'P2002') {
-            const field = err.meta?.target ? err.meta.target.join(', ') : 'field';
-            return res.status(409).json({ error: `An account with this ${field} already exists.` });
+            msg = `Duplicate value entry for unique field: ${err.meta?.target || 'field'}`;
+            code = 409;
+        } else if (err.code === 'P2025') {
+            msg = 'Requested record was not found';
+            code = 404;
         }
-        // P2025: Record not found
-        if (err.code === 'P2025') {
-            return res.status(404).json({ error: 'Record not found.' });
-        }
+        return res.status(code).json({
+            status: 'fail',
+            message: msg,
+            errorCode: err.code
+        });
     }
 
-    if (err.name === 'PrismaClientValidationError') {
-        return res.status(400).json({ error: 'Invalid data provided.' });
+    // Handle JWT Verification Errors
+    if (err.name === 'JsonWebTokenError') {
+        return res.status(401).json({
+            status: 'fail',
+            message: 'Invalid authentication token. Please log in again.'
+        });
+    }
+    if (err.name === 'TokenExpiredError') {
+        return res.status(401).json({
+            status: 'fail',
+            message: 'Your session has expired. Please log in again.'
+        });
     }
 
-    const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
-    res.status(statusCode).json({
-        error: err.name || 'ServerError',
-        message: err.message || 'An unexpected error occurred.',
-        stack: process.env.NODE_ENV === 'production' ? null : err.stack,
+    if (!isProd) {
+        console.error('🔥 [API Error]', {
+            path: req.originalUrl,
+            method: req.method,
+            error: err.message,
+            stack: err.stack
+        });
+    }
+
+    res.status(err.statusCode).json({
+        status: err.status,
+        message: err.message || 'An unexpected internal server error occurred',
+        ...(err.details && { details: err.details }),
+        ...(!isProd && { stack: err.stack })
     });
 };
 
 module.exports = errorHandler;
+module.exports.errorHandler = errorHandler;
+module.exports.AppError = AppError;
+

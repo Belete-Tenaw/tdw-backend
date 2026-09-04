@@ -37,4 +37,11 @@ router.post('/fayda/request-otp', auth, authorize([Roles.SEEKER]), authRateLimit
 router.post('/fayda/verify', auth, authorize([Roles.SEEKER]), authRateLimiter, seekerController.verifyFayda);
 router.get('/concierge/picks', auth, authorize([Roles.EMPLOYER]), seekerController.getConciergePicks);
 
+// Smart AI Matching & Voice Assistant & Certification
+router.get('/smart-jobs', auth, authorize([Roles.SEEKER]), seekerController.getSmartJobsForSeeker);
+router.post('/voice-bio', auth, authorize([Roles.SEEKER]), seekerController.processVoiceBio);
+router.get('/quizzes', auth, authorize([Roles.SEEKER]), seekerController.getQuizzes);
+router.post('/verify-quiz', auth, authorize([Roles.SEEKER]), seekerController.verifyQuiz);
+
 module.exports = router;
+

@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Video, Square, RefreshCw, X, Check, Timer } from 'lucide-react';
 
 /**
@@ -255,9 +256,9 @@ const VideoRecorder = ({ onCapture, onClose, maxDuration = 1200 }) => {
                             }}
                         >
                             {recording ? (
-                                <><Square size={22} fill="white" /> Stop Recording</>
+                                <><Square size={22} fill="white" /> {t('stop_recording')}</>
                             ) : (
-                                <><Video size={22} /> Start Recording</>
+                                <><Video size={22} /> {t('start_recording')}</>
                             )}
                         </button>
                     ) : (
@@ -279,7 +280,7 @@ const VideoRecorder = ({ onCapture, onClose, maxDuration = 1200 }) => {
                                     transition: 'all 0.3s ease'
                                 }}
                             >
-                                <RefreshCw size={22} /> Retake
+                                <RefreshCw size={22} /> {t('retake')}
                             </button>
                             <button
                                 type="button"
@@ -299,7 +300,7 @@ const VideoRecorder = ({ onCapture, onClose, maxDuration = 1200 }) => {
                                     boxShadow: '0 10px 15px -3px rgba(16, 185, 129, 0.4)'
                                 }}
                             >
-                                <Check size={22} /> Use This Video
+                                <Check size={22} /> {t('use_video')}
                             </button>
                         </>
                     )}

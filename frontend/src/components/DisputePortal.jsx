@@ -36,7 +36,7 @@ const DisputePortal = ({ contractId, onClose }) => {
                     <ShieldAlert size={40} />
                 </div>
                 <h2 style={{ fontSize: '1.5rem', fontWeight: '900', color: 'var(--navy)' }}>Dispute Filed</h2>
-                <p style={{ color: 'var(--text-light)', marginBottom: '30px' }}>An EDWL moderator has been assigned to investigate this case. You will be notified of any updates.</p>
+                <p style={{ color: 'var(--text-light)', marginBottom: '30px' }}>A TDW moderator has been assigned to investigate this case. You will be notified of any updates.</p>
                 <button onClick={onClose} className="btn-primary" style={{ width: '100%' }}>Return to Agreement</button>
             </div>
         );

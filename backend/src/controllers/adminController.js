@@ -155,6 +155,77 @@ exports.verifyUser = async (req, res) => {
     }
 };
 
+/**
+ * directVerifyUser - handles the Admin Dashboard's direct verify call.
+ * Called via POST /admin/verify with body: { id, type, status, badge }
+ * This is a simplified approval that directly updates the user record
+ * without requiring a pending VerificationRequest.
+ */
+exports.directVerifyUser = async (req, res) => {
+    try {
+        const { id, type, status, badge } = req.body;
+
+        if (!id || !type || !status) {
+            return res.status(400).json({ error: 'Missing required fields (id, type, status)' });
+        }
+
+        const normalizedStatus = status.toUpperCase(); // APPROVED | REJECTED | PENDING
+        const normalizedType = type.toLowerCase(); // seeker | employer
+
+        if (!['APPROVED', 'REJECTED', 'PENDING'].includes(normalizedStatus)) {
+            return res.status(400).json({ error: 'Invalid status. Must be APPROVED, REJECTED, or PENDING.' });
+        }
+
+        if (normalizedType === 'seeker') {
+            const updateData = { verificationStatus: normalizedStatus };
+            if (normalizedStatus === 'APPROVED' && badge) {
+                updateData.badge = badge;
+                updateData.isVerified = true;
+                // Map badge to tier
+                const tierMap = { SILVER: 'SILVER', GOLD: 'GOLD', PLATINUM: 'PLATINUM' };
+                if (tierMap[badge]) updateData.tier = tierMap[badge];
+            } else if (normalizedStatus === 'REJECTED') {
+                updateData.isVerified = false;
+            }
+            await prisma.jobSeeker.update({ where: { id }, data: updateData });
+
+            // Telegram notification on approval
+            if (normalizedStatus === 'APPROVED') {
+                const updated = await prisma.jobSeeker.findUnique({ where: { id }, select: { badge: true, telegramChatId: true, fullName: true } });
+                if (updated && updated.telegramChatId) {
+                    const badgeName = updated.badge || 'STANDARD';
+                    const message = `🎉 <b>Congratulations ${updated.fullName}!</b>\n\nYour <b>${badgeName}</b> verification has been approved! Your profile is now visible to employers.\n\nመልካም ዜና! የእርስዎ <b>${badgeName}</b> ማዕረግ ጸድቋል።`;
+                    await telegramService.sendMessage(updated.telegramChatId, message);
+                }
+            }
+        } else if (normalizedType === 'employer') {
+            const updateData = { verificationStatus: normalizedStatus };
+            if (normalizedStatus === 'APPROVED') {
+                updateData.isVerified = true;
+                updateData.badge = 'VERIFIED';
+            } else if (normalizedStatus === 'REJECTED') {
+                updateData.isVerified = false;
+            }
+            await prisma.employer.update({ where: { id }, data: updateData });
+        } else {
+            return res.status(400).json({ error: 'Invalid type. Must be seeker or employer.' });
+        }
+
+        // Audit log
+        await logAction(
+            `ADMIN_DIRECT_VERIFY_${normalizedStatus}`,
+            req.user.id,
+            'ADMIN',
+            { targetUserId: id, targetUserType: type, status: normalizedStatus, badge }
+        );
+
+        res.json({ message: `User ${normalizedStatus.toLowerCase()} successfully.` });
+    } catch (error) {
+        console.error('directVerifyUser Error:', error);
+        res.status(400).json({ error: error.message });
+    }
+};
+
 exports.updateAccountStatus = async (req, res) => {
     try {
         const { id, type, action } = req.body; // action: SUSPEND, ACTIVATE
@@ -430,3 +501,42 @@ exports.getAdminStats = async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch analytics' });
     }
 };
+
+/**
+ * 🛡️ Fraud Audit Report Endpoint
+ */
+exports.getFraudAuditReport = async (req, res) => {
+    try {
+        const fraudService = require('../services/fraudDetectionService');
+        const summary = await fraudService.getHighRiskAccountsSummary();
+        res.json({
+            status: 'success',
+            highRiskCount: summary.length,
+            accounts: summary
+        });
+    } catch (error) {
+        console.error('[Admin Fraud Audit Error]', error);
+        res.status(500).json({ error: 'Failed to generate fraud audit report' });
+    }
+};
+
+/**
+ * 🛡️ Detailed Single User Anomaly Audit
+ */
+exports.getSingleUserFraudAudit = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { type } = req.query; // JOB_SEEKER or EMPLOYER
+        const fraudService = require('../services/fraudDetectionService');
+        const audit = await fraudService.auditUserRisk(userId, type || 'JOB_SEEKER');
+        if (!audit) {
+            return res.status(404).json({ error: 'User not found or audit failed' });
+        }
+        res.json({ status: 'success', audit });
+    } catch (error) {
+        console.error('[Single User Fraud Audit Error]', error);
+        res.status(500).json({ error: 'Failed to audit user' });
+    }
+};
+
+

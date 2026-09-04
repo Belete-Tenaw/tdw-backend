@@ -61,9 +61,9 @@ const RewardsDashboard = () => {
                     <p style={{ opacity: 0.9, fontSize: '1.1rem' }}>{t('rewards_subtitle') || 'Refer friends and complete tasks to earn points.'}</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.9rem', fontWeight: '800', opacity: 0.8, marginBottom: '5px', textTransform: 'uppercase' }}>Current Balance</div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: '800', opacity: 0.8, marginBottom: '5px', textTransform: 'uppercase' }}>{t('current_balance')}</div>
                     <div style={{ fontSize: '3.5rem', fontWeight: '900', lineHeight: 1 }}>{points}</div>
-                    <div style={{ fontSize: '1rem', fontWeight: '700', opacity: 0.9 }}>Points</div>
+                    <div style={{ fontSize: '1rem', fontWeight: '700', opacity: 0.9 }}>{t('points_label')}</div>
                 </div>
             </div>
 
@@ -81,20 +81,20 @@ const RewardsDashboard = () => {
                     </div>
                     
                     <div style={{ background: '#f8fafc', padding: '20px', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
-                        <div style={{ fontSize: '0.8rem', fontWeight: '800', color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase' }}>Your Referral Code</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: '800', color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase' }}>{t('referral_code_label')}</div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontSize: '1.5rem', fontWeight: '900', color: 'var(--primary)', letterSpacing: '2px' }}>{profile?.referralCode || 'N/A'}</span>
                             <button 
                                 onClick={() => navigator.clipboard.writeText(profile?.referralCode)}
                                 style={{ background: 'white', border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer' }}
                             >
-                                Copy
+                                {t('copy') || 'Copy'}
                             </button>
                         </div>
                     </div>
                     
                     <p style={{ fontSize: '0.9rem', color: '#64748b', margin: 0 }}>
-                        Earn <strong>50 points</strong> for every friend who registers and verifies their account using your code.
+                        {t('earn_label') || 'Earn'} <strong>50 {t('points_label')}</strong> {t('earned_referral_points')}
                     </p>
                 </div>
 

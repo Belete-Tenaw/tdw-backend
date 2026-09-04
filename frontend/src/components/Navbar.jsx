@@ -52,10 +52,10 @@ const Navbar = () => {
                 <img src={logo} alt="TDW Logo" style={{ height: '55px', width: 'auto', objectFit: 'contain', transition: 'transform 0.3s ease' }} className="nav-logo" />
                 <div className="desktop-only" style={{ display: 'flex', flexDirection: 'column', color: 'var(--navy)' }}>
                     <span style={{ fontSize: '1.2rem', fontWeight: '900', lineHeight: 1, letterSpacing: '-0.2px' }}>
-                        ታማኝ የሃገር ውስጥ ሠራተኞች
+                        {i18n.language === 'am' ? t('brand_amharic') : t('brand_english')}
                     </span>
-                    <span style={{ fontSize: '0.95rem', fontWeight: '700', color: 'var(--primary)', lineHeight: 1, marginTop: '5px' }}>
-                        Trustworthy Domestic Workers
+                    <span style={{ fontSize: '0.85rem', fontWeight: '700', color: 'var(--primary)', lineHeight: 1, marginTop: '5px' }}>
+                        {i18n.language === 'am' ? t('brand_english') : t('brand_amharic')}
                     </span>
                 </div>
             </NavLink>

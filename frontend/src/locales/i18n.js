@@ -30,5 +30,21 @@ i18n
 
 
 
+i18n.on('languageChanged', (lng) => {
+    if (typeof document !== 'undefined') {
+        document.documentElement.lang = lng;
+    }
+    try {
+        localStorage.setItem('i18nextLng', lng);
+    } catch (e) {
+        // ignore localStorage restrictions
+    }
+});
+
+// Set initial html lang attribute
+if (typeof document !== 'undefined') {
+    document.documentElement.lang = i18n.language || storedLanguage;
+}
+
 export default i18n;
 

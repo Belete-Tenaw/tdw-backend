@@ -115,7 +115,7 @@ const Pricing = () => {
 
     const getTelegramLink = () => {
         if (!selectedPlan) return `https://t.me/+251943194099`;
-        const message = encodeURIComponent(`Hello EDWL Support,\n\nI want to subscribe to the ${selectedPlan.name} plan (${selectedPlan.price} ETB).\n\nMy Transaction Reference ID: #${refId}\n\n[ሰላም የEDWL ድጋፍ ሰጪ ክፍል። በ${selectedPlan.name} ፕላን (${selectedPlan.price} ብር) ለመመዝገብ እፈልጋለሁ። የክፍያ መለያዬ፡ #${refId}]`);
+        const message = encodeURIComponent(`Hello TDW Support,\n\nI want to subscribe to the ${selectedPlan.name} plan (${selectedPlan.price} ETB).\n\nMy Transaction Reference ID: #${refId}\n\n[ሰላም የTDW ድጋፍ ሰጪ ክፍል። በ${selectedPlan.name} ፕላን (${selectedPlan.price} ብር) ለመመዝገብ እፈልጋለሁ። የክፍያ መለያዬ፡ #${refId}]`);
         return `https://t.me/+251943194099?text=${message}`;
     };
 

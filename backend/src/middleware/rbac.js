@@ -24,6 +24,7 @@ module.exports = {
     Roles: {
         ADMIN: 'ADMIN',
         SEEKER: 'JOB_SEEKER',
-        EMPLOYER: 'EMPLOYER'
+        EMPLOYER: 'EMPLOYER',
+        AGENCY: 'AGENCY'
     }
 };

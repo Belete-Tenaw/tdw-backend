@@ -10,6 +10,12 @@ import DigitalContractViewer from '../../components/DigitalContractViewer';
 import EscrowTracker from '../../components/EscrowTracker';
 import CandidateComparisonModal from '../../components/CandidateComparisonModal';
 import { FileText, Columns } from 'lucide-react';
+import SmartSearchWizard from '../../components/SmartSearchWizard';
+import SOSFloatingButton from '../../components/SOSFloatingButton';
+import SmartMatchBadge from '../../components/SmartMatchBadge';
+import MicroInsuranceModal from '../../components/MicroInsuranceModal';
+import AIMatchMatrixModal from '../../components/AIMatchMatrixModal';
+import HouseholdChecklistModal from '../../components/HouseholdChecklistModal';
 
 const EmployerDashboard = () => {
     const { t } = useTranslation();
@@ -19,7 +25,13 @@ const EmployerDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedWorker, setSelectedWorker] = useState(null);
+    const [aiMatrixCandidate, setAiMatrixCandidate] = useState(null);
     const [myJobs, setMyJobs] = useState([]);
+    const [showInsuranceModal, setShowInsuranceModal] = useState(false);
+    const [selectedWorkerForInsurance, setSelectedWorkerForInsurance] = useState(null);
+    const [selectedContractForChecklist, setSelectedContractForChecklist] = useState(null);
+    const [showChecklistModal, setShowChecklistModal] = useState(false);
+
     const [selectedJobForMatches, setSelectedJobForMatches] = useState(null);
     const [matches, setMatches] = useState([]);
     const [copied, setCopied] = useState(false);
@@ -463,6 +475,14 @@ const EmployerDashboard = () => {
                             {selectedJobForMatches ? `${t('matches_for') || 'Matches for'} "${myJobs.find(j => j.id === selectedJobForMatches)?.title}"` : t('all_workers') || 'Available Workers'}
                         </h3>
 
+                        <SmartSearchWizard
+                            locations={uniqueLocations}
+                            onComplete={(filters) => {
+                                setSearchTerm(filters.skill || '');
+                                setFilterLocation(filters.location || '');
+                            }}
+                        />
+
                         <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
                             <div style={{ position: 'relative', flex: 1 }}>
                                 <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
@@ -568,13 +588,20 @@ const EmployerDashboard = () => {
                                                         <Activity size={10} /> POLICE
                                                     </div>
                                                 )}
-                                                {worker.match_score > 0 && (
-                                                    <div 
-                                                        title={`Skills: 40%, Proximity: 20%, Behavior: 20%, Rating: 10%, Tier: 10%`}
-                                                        style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#dcfce7', color: '#15803d', padding: '3px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid #bbf7d0', cursor: 'help' }}
-                                                    >
-                                                        🎯 {worker.match_score}% Match
-                                                    </div>
+                                                {worker.match_score > 0 ? (
+                                                    <SmartMatchBadge 
+                                                        compatibilityScore={worker.match_score} 
+                                                        isStrongMatch={worker.match_score >= 75} 
+                                                        breakdown={worker.breakdown} 
+                                                        seekerName={worker.fullName || worker.full_name} 
+                                                    />
+                                                ) : (
+                                                    <SmartMatchBadge 
+                                                        compatibilityScore={worker.compatibilityScore || 85} 
+                                                        isStrongMatch={true} 
+                                                        breakdown={worker.breakdown} 
+                                                        seekerName={worker.fullName || worker.full_name} 
+                                                    />
                                                 )}
                                                 {(worker.isFeatured || worker.s_featured > 0) && (
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fff7ed', color: '#c2410c', padding: '3px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid #ffedd5' }}>
@@ -627,9 +654,18 @@ const EmployerDashboard = () => {
                                                 </div>
                                             </div>
 
-                                            <button onClick={() => setSelectedWorker(worker)} style={{ width: '100%', padding: '10px', border: '1px solid #ddd', background: 'transparent', borderRadius: '8px', fontWeight: '500', color: 'var(--text)', cursor: 'pointer' }}>
-                                                {t('view_profile')}
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                                <button onClick={() => setSelectedWorker(worker)} style={{ flex: 1, padding: '10px', border: '1px solid #ddd', background: 'transparent', borderRadius: '8px', fontWeight: '500', color: 'var(--text)', cursor: 'pointer' }}>
+                                                    {t('view_profile')}
+                                                </button>
+                                                <button
+                                                    onClick={() => setAiMatrixCandidate(worker)}
+                                                    style={{ flex: 1, padding: '10px', border: 'none', background: 'linear-gradient(135deg, var(--primary) 0%, #006666 100%)', color: 'white', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}
+                                                    title={t('ai_match_matrix_title')}
+                                                >
+                                                    <Sparkles size={14} /> AI Match
+                                                </button>
+                                            </div>
                                         </>
                                     )}
                                 </div>
@@ -648,12 +684,35 @@ const EmployerDashboard = () => {
                         </div>
                     ) : (
                         contracts.map(contract => (
-                            <DigitalContractViewer 
-                                key={contract.id} 
-                                contract={contract} 
-                                userRole="employer" 
-                                onUpdate={fetchDashboardData}
-                            />
+                            <div key={contract.id} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <DigitalContractViewer 
+                                    contract={contract} 
+                                    userRole="employer" 
+                                    onUpdate={fetchDashboardData}
+                                />
+                                <button
+                                    onClick={() => {
+                                        setSelectedContractForChecklist(contract.id);
+                                        setShowChecklistModal(true);
+                                    }}
+                                    style={{
+                                        padding: '10px 16px',
+                                        backgroundColor: '#0f766e',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        borderRadius: '10px',
+                                        fontWeight: '700',
+                                        fontSize: '0.85rem',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px'
+                                    }}
+                                >
+                                    📦 {t('household_checklist_btn') || 'Household Handover Checklist'}
+                                </button>
+                            </div>
                         ))
                     )}
                 </div>
@@ -693,6 +752,29 @@ const EmployerDashboard = () => {
                     onClose={() => setShowComparison(false)} 
                 />
             )}
+
+            <MicroInsuranceModal
+                isOpen={showInsuranceModal}
+                onClose={() => setShowInsuranceModal(false)}
+                workerId={selectedWorkerForInsurance?.id || 'worker-1'}
+                workerName={selectedWorkerForInsurance?.fullName || selectedWorkerForInsurance?.full_name || 'Worker'}
+            />
+
+            <AIMatchMatrixModal
+                isOpen={Boolean(aiMatrixCandidate)}
+                candidate={aiMatrixCandidate}
+                onClose={() => setAiMatrixCandidate(null)}
+                onConnect={(cand) => setSelectedWorker(cand)}
+            />
+
+            <HouseholdChecklistModal
+                isOpen={showChecklistModal}
+                onClose={() => setShowChecklistModal(false)}
+                contractId={selectedContractForChecklist}
+                userRole="EMPLOYER"
+            />
+            
+            <SOSFloatingButton />
         </div >
     );
 };

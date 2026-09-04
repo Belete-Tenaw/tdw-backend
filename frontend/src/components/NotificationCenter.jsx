@@ -39,7 +39,7 @@ const NotificationCenter = ({ user }) => {
 
     const fetchNotifications = async () => {
         try {
-            const res = await api.get('/api/auth/notifications'); // I'll need to create this endpoint
+            const res = await api.get('/auth/notifications');
             setNotifications(res.data);
             setUnreadCount(res.data.filter(n => !n.read).length);
         } catch (error) {
@@ -49,7 +49,7 @@ const NotificationCenter = ({ user }) => {
 
     const markAsRead = async (id) => {
         try {
-            await api.put(`/api/auth/notifications/${id}/read`);
+            await api.put(`/auth/notifications/${id}/read`);
             setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
             setUnreadCount(prev => Math.max(0, prev - 1));
         } catch (error) {
@@ -59,7 +59,7 @@ const NotificationCenter = ({ user }) => {
 
     const markAllAsRead = async () => {
         try {
-            await api.put('/api/auth/notifications/read-all');
+            await api.put('/auth/notifications/read-all');
             setNotifications(prev => prev.map(n => ({ ...n, read: true })));
             setUnreadCount(0);
         } catch (error) {

@@ -250,7 +250,7 @@ const Messages = () => {
                         {/* Security Banner */}
                         <div style={{ background: '#f0fdf4', padding: '8px 15px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.75rem', color: '#166534', borderBottom: '1px solid #dcfce7' }}>
                             <Shield size={14} />
-                            <span>Messages are end-to-end encrypted. Nobody outside of this chat, not even EDWL, can read them.</span>
+                            <span>Messages are end-to-end encrypted. Nobody outside of this chat, not even TDW, can read them.</span>
                         </div>
 
                         <div ref={scrollRef} style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px' }}>

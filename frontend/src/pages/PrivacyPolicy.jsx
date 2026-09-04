@@ -28,7 +28,7 @@ const PrivacyPolicy = () => {
 
             <section className="mb-6">
                 <h2 className="text-xl font-semibold mb-2">{t('privacy_4_title')}</h2>
-                <p>{t('privacy_4_text')} support@edwl.com</p>
+                <p>{t('privacy_4_text')} <a href="mailto:trustworthyaddis@gmail.com" style={{ color: 'var(--primary)', fontWeight: '600' }}>trustworthyaddis@gmail.com</a> or call <a href="tel:+251943194099" style={{ color: 'var(--primary)', fontWeight: '600' }}>+251 943 194 099</a></p>
             </section>
         </div>
     );

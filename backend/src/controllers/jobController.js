@@ -256,3 +256,24 @@ exports.getMatchesForJob = async (req, res) => {
         res.status(500).json({ error: "Failed to calculate matching seekers" });
     }
 };
+
+/**
+ * 🚀 High-Level AI Smart Matchmaker (Engine 2.0)
+ * Evaluates candidate compatibility using multi-parametric weighted engine.
+ */
+exports.getSmartCandidatesForJob = async (req, res) => {
+    try {
+        const { jobId } = req.params;
+        const smartMatchEngine = require('../services/smartMatchEngine');
+        const candidates = await smartMatchEngine.findTopCandidatesForJob(jobId, 15);
+        res.json({
+            status: 'success',
+            count: candidates.length,
+            candidates
+        });
+    } catch (error) {
+        console.error('[Smart Candidates Error]:', error);
+        res.status(500).json({ error: 'Failed to compute AI matches for job post' });
+    }
+};
+

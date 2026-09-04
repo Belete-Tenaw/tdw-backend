@@ -93,7 +93,7 @@ const Activate = () => {
     };
 
     const getSupportLink = () => {
-        const message = encodeURIComponent(`Hello EDWL Support, I am having trouble activating my code: ${code}. It shows as invalid.\n\n[ሰላም የEDWL ድጋፍ ሰጪ ክፍል። ኮድ ለማስገባት ስሞክር እምቢ አለኝ። ኮዱ፡ ${code}]`);
+        const message = encodeURIComponent(`Hello TDW Support, I am having trouble activating my code: ${code}. It shows as invalid.\n\n[ሰላም የTDW ድጋፍ ሰጪ ክፍል። ኮድ ለማስገባት ስሞክር እምቢ አለኝ። ኮዱ፡ ${code}]`);
         return `https://t.me/+251943194099?text=${message}`;
     };
 

@@ -137,5 +137,33 @@ if (!token) {
         }
     });
 
+    /**
+     * User-facing: Search recent job matches directly in Telegram.
+     * Usage: /jobs
+     */
+    bot.onText(/\/jobs/, async (msg) => {
+        const chatId = msg.chat.id.toString();
+        try {
+            const jobs = await prisma.jobPost.findMany({
+                take: 5,
+                orderBy: { createdAt: 'desc' }
+            });
+
+            if (jobs.length === 0) {
+                return bot.sendMessage(chatId, '📋 No active job listings found right now. Check back soon!');
+            }
+
+            let responseText = '📌 <b>Recent Job Opportunities in Ethiopia:</b>\n\n';
+            jobs.forEach((j, idx) => {
+                responseText += `${idx + 1}. <b>${j.title}</b>\n💰 Salary: ${j.salaryOffered} ETB\n📍 Location: ${j.address || j.locationRegion || 'Addis Ababa'}\n\n`;
+            });
+
+            bot.sendMessage(chatId, responseText, { parse_mode: 'HTML' });
+        } catch (err) {
+            console.error('[TelegramBot Jobs Error]', err);
+            bot.sendMessage(chatId, '❌ Failed to fetch job listings.');
+        }
+    });
+
     module.exports = bot;
 }

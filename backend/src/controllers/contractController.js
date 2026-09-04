@@ -85,3 +85,40 @@ exports.getContracts = async (req, res) => {
         res.status(500).json({ error: "Failed to fetch contracts." });
     }
 };
+
+/**
+ * ✍️ E-Sign Contract with Digital Certificate Hash
+ */
+exports.eSignContract = async (req, res) => {
+    try {
+        const { contractId } = req.params;
+        const { signatureBase64, otpCode } = req.body;
+        const userId = req.user.id || req.user.userId;
+        const userRole = req.user.role;
+
+        const contractSigningService = require('../services/contractSigningService');
+        const result = await contractSigningService.eSignContract(contractId, userId, userRole, signatureBase64, otpCode);
+        res.json(result);
+    } catch (error) {
+        console.error('[E-Sign Contract Error]', error);
+        res.status(500).json({ error: error.message || 'Failed to e-sign contract' });
+    }
+};
+
+/**
+ * 🔄 Renew Contract Extension
+ */
+exports.renewContract = async (req, res) => {
+    try {
+        const { contractId } = req.params;
+        const { extensionMonths } = req.body;
+
+        const contractSigningService = require('../services/contractSigningService');
+        const result = await contractSigningService.renewContract(contractId, extensionMonths || 6);
+        res.json(result);
+    } catch (error) {
+        console.error('[Renew Contract Error]', error);
+        res.status(500).json({ error: error.message || 'Failed to renew contract' });
+    }
+};
+

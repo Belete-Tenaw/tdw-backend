@@ -429,7 +429,7 @@ const EditProfile = () => {
                                 <label className="label">{t('video_bio')} (Max 15s, 3MB) {t('optional')}</label>
                                 <input type="file" className="input" name="videoBio" accept="video/*" onChange={handleVideoChange} />
                                 {(formData.videoBioPreview || formData.videoBio) && (
-                                    <video src={formData.videoBioPreview || (formData.videoBio?.startsWith('http') ? formData.videoBio : `https://edwl-backend.onrender.com${formData.videoBio}`)} controls style={{ width: '100%', maxWidth: '300px', marginTop: '10px', borderRadius: '8px' }} />
+                                    <video src={formData.videoBioPreview || (formData.videoBio?.startsWith('http') ? formData.videoBio : `https://edwl-backend-1.onrender.com${formData.videoBio}`)} controls style={{ width: '100%', maxWidth: '300px', marginTop: '10px', borderRadius: '8px' }} />
                                 )}
                             </div>
 
@@ -575,4 +575,3 @@ const EditProfile = () => {
 };
 
 export default EditProfile;
-

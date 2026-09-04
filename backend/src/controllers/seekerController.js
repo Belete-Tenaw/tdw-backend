@@ -295,3 +295,83 @@ exports.getConciergePicks = async (req, res) => {
         res.status(500).json({ message: err.message });
     }
 };
+
+/**
+ * 🎯 Smart AI Job Matches for Job Seekers
+ */
+exports.getSmartJobsForSeeker = async (req, res) => {
+    try {
+        const seekerId = req.user.id;
+        const smartMatchEngine = require('../services/smartMatchEngine');
+        const smartJobs = await smartMatchEngine.findTopJobsForSeeker(seekerId, 15);
+        res.json({
+            status: 'success',
+            count: smartJobs.length,
+            jobs: smartJobs
+        });
+    } catch (error) {
+        console.error('[Smart Jobs Error]', error);
+        res.status(500).json({ error: 'Failed to calculate smart job matches' });
+    }
+};
+
+/**
+ * 🎙️ Voice Assistant Audio Bio Processor
+ */
+exports.processVoiceBio = async (req, res) => {
+    try {
+        const seekerId = req.user.id;
+        const { audioUrl, language } = req.body;
+        const voiceAssistantService = require('../services/voiceAssistantService');
+        const result = await voiceAssistantService.processAudioBio(audioUrl, language);
+
+        if (result.status === 'processed' && seekerId) {
+            await prisma.jobSeeker.update({
+                where: { id: seekerId },
+                data: {
+                    videoBio: audioUrl || undefined,
+                    bio: result.transcription || undefined
+                }
+            });
+        }
+        res.json(result);
+    } catch (error) {
+        console.error('[Process Voice Bio Error]', error);
+        res.status(500).json({ error: 'Failed to process voice bio' });
+    }
+};
+
+/**
+ * 🎓 Skill Certification Micro-Quizzes
+ */
+exports.getQuizzes = async (req, res) => {
+    res.json({
+        quizzes: [
+            { id: 'childcare_101', title: 'Childcare & Infant Safety', category: 'Childcare', points: 25, questionsCount: 3 },
+            { id: 'cooking_101', title: 'Ethiopian Culinary & Hygiene', category: 'Cooking', points: 20, questionsCount: 3 },
+            { id: 'elderly_101', title: 'Elder Care & First Aid', category: 'Elderly', points: 30, questionsCount: 3 },
+            { id: 'cleaning_101', title: 'Home Management & Sanitation', category: 'Cleaning', points: 15, questionsCount: 3 }
+        ]
+    });
+};
+
+exports.verifyQuiz = async (req, res) => {
+    try {
+        const seekerId = req.user.id;
+        const { quizId, score } = req.body;
+        if (score >= 70) {
+            const seeker = await prisma.jobSeeker.findUnique({ where: { id: seekerId } });
+            const updatedPoints = ((seeker && seeker.rewardPoints) || 0) + 25;
+            await prisma.jobSeeker.update({
+                where: { id: seekerId },
+                data: { rewardPoints: updatedPoints }
+            });
+            return res.json({ status: 'success', message: 'Quiz passed! Skill badge unlocked.', bonusPoints: 25, totalPoints: updatedPoints });
+        }
+        res.status(400).json({ status: 'failed', message: 'Passing score is 70%. Please try again.' });
+    } catch (error) {
+        console.error('[Quiz Verification Error]', error);
+        res.status(500).json({ error: 'Failed to process quiz verification' });
+    }
+};
+

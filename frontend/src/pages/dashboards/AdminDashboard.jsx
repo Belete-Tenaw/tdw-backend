@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import api, { API_BASE_URL } from '../../services/api';
-import { Users, Briefcase, CreditCard, Shield, AlertTriangle, FileText, Activity, Camera } from 'lucide-react';
+import { Users, Briefcase, CreditCard, Shield, AlertTriangle, FileText, Activity, Camera, MapPin } from 'lucide-react';
 import PremiumCodeFactory from '../admin/PremiumCodeFactory';
 import AdminInsights from './AdminInsights';
+import GeographicHeatmapModal from '../../components/GeographicHeatmapModal';
 
 // Helper function to get full document URL
 const getDocumentUrl = (path) => {
@@ -26,6 +27,17 @@ const AdminDashboard = () => {
     const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, PENDING, APPROVED, REJECTED, BLOCKED
     const [stats, setStats] = useState(null);
     const [days, setDays] = useState(30);
+    const [showHeatmap, setShowHeatmap] = useState(false);
+    const [fraudReport, setFraudReport] = useState(null);
+
+    const fetchFraudAudit = async () => {
+        try {
+            const res = await api.get('/admin/fraud-audit');
+            setFraudReport(res.data);
+        } catch (err) {
+            console.error('Failed to fetch fraud audit', err);
+        }
+    };
 
     const fetchData = async () => {
         try {
@@ -113,6 +125,8 @@ const AdminDashboard = () => {
                     <button onClick={() => setActiveTab('pulse')} style={{ padding: '8px 15px', borderRadius: '8px', border: 'none', background: activeTab === 'pulse' ? 'white' : 'transparent', fontWeight: '500', cursor: 'pointer' }}>📊 Pulse</button>
                     <button onClick={() => setActiveTab('insights')} style={{ padding: '8px 15px', borderRadius: '8px', border: 'none', background: activeTab === 'insights' ? 'white' : 'transparent', fontWeight: '500', cursor: 'pointer' }}>📈 Insights</button>
                     <button onClick={() => setActiveTab('codes')} style={{ padding: '8px 15px', borderRadius: '8px', border: 'none', background: activeTab === 'codes' ? 'white' : 'transparent', fontWeight: '500', cursor: 'pointer' }}>{t('codes')}</button>
+                    <button onClick={() => { setActiveTab('fraud'); fetchFraudAudit(); }} style={{ padding: '8px 15px', borderRadius: '8px', border: 'none', background: activeTab === 'fraud' ? 'white' : 'transparent', fontWeight: '500', cursor: 'pointer', color: activeTab === 'fraud' ? '#dc2626' : '#475569' }}>🛡️ Fraud Audit</button>
+                    <button onClick={() => setShowHeatmap(true)} style={{ padding: '8px 15px', borderRadius: '8px', border: 'none', background: '#3b82f6', color: 'white', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}><MapPin size={14}/> Map</button>
                 </div>
             </div>
 
@@ -485,6 +499,72 @@ const AdminDashboard = () => {
             {activeTab === 'codes' && (
                 <PremiumCodeFactory />
             )}
+
+            {activeTab === 'fraud' && (
+                <div style={{ display: 'grid', gap: '20px' }}>
+                    <div className="card" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: 'white' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <AlertTriangle color="#ef4444" /> AI Fraud & Anomaly Audit Guard
+                                </h3>
+                                <p style={{ margin: '6px 0 0', fontSize: '0.85rem', color: '#94a3b8' }}>
+                                    Automated multi-vector risk analysis evaluating Fayda duplicate IDs, velocity, and safety reports.
+                                </p>
+                            </div>
+                            <div style={{ padding: '12px 20px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid rgba(239, 68, 68, 0.4)', textAlign: 'center' }}>
+                                <div style={{ fontSize: '1.8rem', fontWeight: '800', color: '#fca5a5' }}>
+                                    {fraudReport?.highRiskCount || 0}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#cbd5e1' }}>Flagged Accounts</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {(!fraudReport || !fraudReport.accounts || fraudReport.accounts.length === 0) ? (
+                        <div className="card" style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                            ✅ No high-risk accounts detected. All active profiles are clear.
+                        </div>
+                    ) : (
+                        fraudReport.accounts.map((acc, idx) => (
+                            <div key={idx} className="card" style={{ borderLeft: acc.riskLevel === 'HIGH' ? '5px solid #ef4444' : '5px solid #f59e0b' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <h4 style={{ margin: 0 }}>{acc.fullName || acc.contactName}</h4>
+                                            <span style={{ fontSize: '0.75rem', fontWeight: '800', padding: '3px 10px', borderRadius: '20px', background: acc.riskLevel === 'HIGH' ? '#fee2e2' : '#fef3c7', color: acc.riskLevel === 'HIGH' ? '#991b1b' : '#92400e' }}>
+                                                {acc.riskLevel} RISK ({acc.riskScore}/100)
+                                            </span>
+                                            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>📞 {acc.phone}</span>
+                                        </div>
+
+                                        <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                            {acc.flags.map((flag, fIdx) => (
+                                                <span key={fIdx} style={{ fontSize: '0.75rem', padding: '4px 10px', borderRadius: '8px', background: '#f1f5f9', color: '#334155', border: '1px solid #e2e8f0', fontWeight: '600' }}>
+                                                    ⚠️ {flag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => handleStatusChange({ id: acc.userId, type: acc.userType === 'JOB_SEEKER' ? 'seeker' : 'employer' }, 'BLOCK')}
+                                        style={{ padding: '8px 16px', borderRadius: '8px', background: '#dc2626', color: 'white', border: 'none', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.8rem' }}
+                                    >
+                                        Suspend Account
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+
+            <GeographicHeatmapModal 
+                isOpen={showHeatmap} 
+                onClose={() => setShowHeatmap(false)} 
+
+            />
         </div>
     );
 };

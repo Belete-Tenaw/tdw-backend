@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Facebook, Twitter, Instagram, Mail, ShieldCheck, Lock } from 'lucide-react';
+import { Facebook, Twitter, Instagram, Mail, Phone, ShieldCheck, Lock } from 'lucide-react';
 import logo from '../assets/logo_modern.png';
 
 const Footer = () => {
@@ -14,7 +14,7 @@ const Footer = () => {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <img src={logo} alt="TDW Logo" style={{ height: '50px', width: 'auto' }} />
                         <h3 style={{ fontSize: '1.1rem', fontWeight: '900', color: 'white', letterSpacing: '0.5px' }}>
-                            TRUSTWORTHY DOMESTIC<br/>WORKERS
+                            {t('brand_english')}
                         </h3>
                     </div>
                     <p style={{ color: '#bdc3c7', lineHeight: '1.6' }}>
@@ -44,9 +44,13 @@ const Footer = () => {
 
                 <div>
                     <h3 style={{ fontSize: '1.1rem', marginBottom: '20px' }}>{t('contact_us')}</h3>
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+                        <Mail size={20} color="#bdc3c7" style={{ flexShrink: 0, marginTop: '2px' }} />
+                        <a href="mailto:trustworthyaddis@gmail.com" style={{ color: '#bdc3c7', textDecoration: 'none', fontSize: '0.9rem' }}>trustworthyaddis@gmail.com</a>
+                    </div>
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
-                        <Mail size={20} color="#bdc3c7" />
-                        <span style={{ color: '#bdc3c7' }}>trustworthyaddis@gmail.com</span>
+                        <Phone size={20} color="#bdc3c7" style={{ flexShrink: 0 }} />
+                        <a href="tel:+251943194099" style={{ color: '#bdc3c7', textDecoration: 'none', fontSize: '0.9rem' }}>+251 943 194 099</a>
                     </div>
                     <div style={{ display: 'flex', gap: '15px' }}>
                         <Facebook size={24} color="#bdc3c7" style={{ cursor: 'pointer' }} />

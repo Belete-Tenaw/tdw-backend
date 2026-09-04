@@ -57,7 +57,7 @@ const AcademyDashboard = () => {
         <div className="container" style={{ paddingTop: '100px', minHeight: '90vh' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
                 <div>
-                    <h1 style={{ fontSize: '2.5rem', fontWeight: '900', color: 'var(--navy)', marginBottom: '10px' }}>EDWL Academy</h1>
+                    <h1 style={{ fontSize: '2.5rem', fontWeight: '900', color: 'var(--navy)', marginBottom: '10px' }}>TDW Academy</h1>
                     <p style={{ color: 'var(--text-light)', fontSize: '1.1rem' }}>Upskill your career and earn trust badges to get hired faster.</p>
                 </div>
                 <div style={{ textAlign: 'center', background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)', padding: '20px', borderRadius: '20px', color: 'white', boxShadow: '0 10px 20px rgba(245, 158, 11, 0.2)' }}>

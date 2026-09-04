@@ -9,7 +9,7 @@ const PanicButton = ({ contractId }) => {
     const BACKEND_URL = process.env.REACT_APP_API_URL || 'https://edwl-backend.onrender.com';
 
     const handlePanic = async () => {
-        if (!window.confirm("⚠️ EMERGENCY: This will alert EDWL administration that you need immediate assistance. Continue?")) {
+        if (!window.confirm("⚠️ EMERGENCY: This will alert TDW administration that you need immediate assistance. Continue?")) {
             return;
         }
 

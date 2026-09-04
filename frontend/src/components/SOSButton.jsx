@@ -82,7 +82,7 @@ const SOSButton = () => {
                     </div>
                     <div style={{ textAlign: 'center' }}>
                         <h4 style={{ margin: '0 0 5px', color: '#b91c1c', fontWeight: '800' }}>{t('trigger_sos_title') || 'Trigger Emergency Alert?'}</h4>
-                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>{t('sos_confirm_desc') || 'This will alert EDWL security and your emergency contacts immediately.'}</p>
+                        <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b' }}>{t('sos_confirm_desc') || 'This will alert TDW security and your emergency contacts immediately.'}</p>
                     </div>
                     <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
                         <button 
