@@ -19,13 +19,16 @@ if (process.env.NODE_ENV !== 'test') {
                 });
 
                 for (const job of jobs) {
-                    // Get AI matches
-                    const matches = await prisma.$queryRawUnsafe(`SELECT * FROM match_seekers_for_job($1::uuid) LIMIT 3`, job.id);
+                    const smartMatchEngine = require('../services/smartMatchEngine');
+                    const matches = await smartMatchEngine.findTopCandidatesForJob(job.id, 3);
 
                     if (matches && matches.length > 0) {
                         const topMatch = matches[0];
-                        if (topMatch.s_score > 70 && topMatch.s_tier === 'PLATINUM') {
-                            const message = `🎯 <b>Great News!</b>\n\nWe found a highly-rated <b>${topMatch.s_score}% Match</b> for your "${job.title}" post today. This worker is <b>PLATINUM Verified</b> (Police & Medically Cleared).\n\n🔒 Upgrade your Trust Access to view their contact info and hire them securely!\n\nVisit: https://trustworthydomesticworkersl.web.app`;
+                        const score = topMatch.compatibilityScore;
+                        const tier = topMatch.seeker?.tier || topMatch.tierBadge;
+                        
+                        if (score >= 70 && tier === 'PLATINUM') {
+                            const message = `🎯 <b>Great News!</b>\n\nWe found a highly-rated <b>${score}% Match</b> for your "${job.title}" post today. This worker is <b>PLATINUM Verified</b> (Police & Medically Cleared).\n\n🔒 Upgrade your Trust Access to view their contact info and hire them securely!\n\nVisit: https://trustworthydomesticworkersl.web.app`;
 
                             // Send Telegram Message if linked
                             if (employer.telegramChatId) {

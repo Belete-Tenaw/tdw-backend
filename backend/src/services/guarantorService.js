@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const prisma = require('../utils/prisma');
+const smsService = require('./smsService');
 
 class GuarantorService {
     async createVerificationRequest(seekerId, { guarantorName, guarantorPhone, guarantorRelationship }) {
@@ -25,13 +26,18 @@ class GuarantorService {
         });
         const baseUrl = process.env.CLIENT_URL || process.env.BASE_URL || 'http://localhost:5173';
         const consentUrl = baseUrl + '/guarantor-consent?token=' + token;
+
+        // Send SMS to guarantor
+        const smsMessage = `TDW: ${seeker.fullName} has requested you as their Legal Guarantor (ዋስ). Your verification code is ${otpCode}. Please complete consent here: ${consentUrl}`;
+        await smsService.sendSMS(guarantorPhone, smsMessage);
+
         return {
             status: 'PENDING_GUARANTOR_CONSENT',
-            message: 'Guarantor verification invite generated successfully.',
+            message: 'Guarantor verification invite generated and SMS sent successfully.',
             guarantorName,
             guarantorPhone,
             consentUrl,
-            otpCode,
+            otpCode, // Usually we wouldn't return OTP in production response, but keeping for dev flow
             expiresAt
         };
     }

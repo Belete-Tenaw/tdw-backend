@@ -1,5 +1,7 @@
 const prisma = require('../utils/prisma');
 const telegramService = require('../services/telegramService');
+const fraudDetectionService = require('../services/fraudDetectionService');
+const notificationService = require('../services/notificationService');
 
 exports.sendMessage = async (req, res) => {
     try {
@@ -14,6 +16,27 @@ exports.sendMessage = async (req, res) => {
         if (!receiverId) {
             return res.status(400).json({ error: 'Receiver ID is required' });
         }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 🛡️ ANTI-POACHING FRAUD SHIELD — Real-time Content Scan
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        const poachingScan = fraudDetectionService.scanTextForPoaching(content);
+        if (poachingScan.riskScore >= 70) {
+            // HIGH risk: block the message entirely
+            return res.status(400).json({
+                error: 'Message blocked by TDW Safety Shield',
+                reason: 'Your message appears to contain direct contact information or off-platform solicitation.',
+                flaggedPatterns: poachingScan.flaggedPatterns,
+                fraudRisk: 'HIGH',
+                tip: 'Please keep all communication within the TDW platform to stay protected.'
+            });
+        }
+        // Medium risk (40-69): allow but attach a warning in the response
+        const fraudWarning = poachingScan.riskScore >= 40 ? {
+            warning: 'Your message may contain sensitive contact details. For your safety, keep communication on-platform.',
+            fraudRisk: 'MEDIUM',
+            flaggedPatterns: poachingScan.flaggedPatterns
+        } : null;
 
         // Check if user is subscriber if it's the first message
         const existingChat = await prisma.message.findFirst({
@@ -40,6 +63,10 @@ exports.sendMessage = async (req, res) => {
             if (senderRole === 'EMPLOYER' && receiverType === 'JOB_SEEKER') {
                 const employer = await prisma.employer.findUnique({ where: { id: senderId } });
                 const worker = await prisma.jobSeeker.findUnique({ where: { id: receiverId } });
+
+                if (!employer || !worker) {
+                    return res.status(404).json({ error: 'User not found' });
+                }
 
                 // 1. Time Access Check
                 if (!employer.subscriptionExpiry || new Date(employer.subscriptionExpiry) < new Date()) {
@@ -71,7 +98,7 @@ exports.sendMessage = async (req, res) => {
                 }
             } else if (senderRole === 'JOB_SEEKER') {
                 const user = await prisma.jobSeeker.findUnique({ where: { id: senderId } });
-                if (user.tier === 'BRONZE') {
+                if (!user || user.tier === 'BRONZE') {
                     return res.status(403).json({
                         error: 'Action restricted',
                         message: 'Only verified Job Seekers (Silver and above) can initiate conversations.'
@@ -131,30 +158,69 @@ exports.sendMessage = async (req, res) => {
             }
         });
 
-        // 🟢 Emit Real-time Socket Event
+        // 🟢 Emit Real-time Socket Event to BOTH sender and receiver rooms
         const io = req.app.get('io');
         if (io) {
             io.to(receiverId).emit('new_message', message);
-            
+            io.to(senderId).emit('new_message', message); // Sender optimistic update
         }
 
-        // 💬 Send Telegram Alert to Receiver (Proactive Betterment)
+        // 📬 Dual-Channel Notification: In-App + Telegram with Mini-App button
         try {
-            const receiver = await prisma[receiverType === 'JOB_SEEKER' ? 'jobSeeker' : 'employer'].findUnique({
-                where: { id: receiverId },
-                select: { telegramChatId: true, fullName: receiverType === 'JOB_SEEKER', contactName: receiverType === 'EMPLOYER' }
-            });
+            const isSeeker = receiverType === 'JOB_SEEKER';
+            const receiver = isSeeker
+                ? await prisma.jobSeeker.findUnique({
+                    where: { id: receiverId },
+                    select: { telegramChatId: true, fullName: true, fcmToken: true, phone: true }
+                })
+                : await prisma.employer.findUnique({
+                    where: { id: receiverId },
+                    select: { telegramChatId: true, contactName: true, fcmToken: true, phone: true }
+                });
 
-            if (receiver && receiver.telegramChatId) {
-                const senderName = senderRole === 'JOB_SEEKER' ? message.senderJS.fullName : message.senderEmp.contactName;
-                const telegramText = `📩 <b>New Message from ${senderName}</b>\n\n"${content.substring(0, 100)}${content.length > 100 ? '...' : ''}"\n\nReply here: https://trustworthydomesticworkersl.web.app/messages`;
-                await telegramService.sendMessage(receiver.telegramChatId, telegramText);
+            if (receiver) {
+                const senderName = senderRole === 'JOB_SEEKER' ? message.senderJS?.fullName : message.senderEmp?.contactName;
+                const receiverName = isSeeker ? receiver.fullName : receiver.contactName;
+                const preview = content.substring(0, 120) + (content.length > 120 ? '...' : '');
+                const miniAppUrl = (process.env.CLIENT_URL || 'https://trustworthydomesticworkers.web.app') + '/messages';
+
+                // 1. In-app notification
+                if (io) {
+                    await notificationService.createInAppNotification(
+                        receiverId,
+                        receiverType,
+                        `New message from ${senderName || 'TDW User'}`,
+                        preview,
+                        'MESSAGE',
+                        io
+                    );
+                }
+
+                // 2. Telegram with inline Mini-App button
+                if (receiver.telegramChatId) {
+                    const telegramText = `📩 <b>New Message from ${senderName || 'TDW User'}</b>\n\n"${preview}"\n\n<i>Reply directly inside the TDW app.</i>`;
+                    await telegramService.sendMessageWithButton(
+                        receiver.telegramChatId,
+                        telegramText,
+                        { text: '💬 Open TDW Messages', url: miniAppUrl }
+                    ).catch(() => telegramService.sendMessage(receiver.telegramChatId, telegramText));
+                }
+
+                // 3. FCM Push (if token available)
+                if (receiver.fcmToken) {
+                    await notificationService.sendPushNotification(
+                        receiver.fcmToken,
+                        `Message from ${senderName || 'TDW User'}`,
+                        preview,
+                        { type: 'MESSAGE', senderId }
+                    ).catch(e => console.warn('[FCM] Push failed:', e.message));
+                }
             }
         } catch (alertError) {
-            console.error('[Telegram Alert Error] Failed to notify message receiver:', alertError.message);
+            console.error('[Notification Error] Failed to notify message receiver:', alertError.message);
         }
 
-        res.status(201).json(message);
+        res.status(201).json({ ...message, ...(fraudWarning ? { fraudWarning } : {}) });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

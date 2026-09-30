@@ -9,17 +9,17 @@ const cacheService = require('../services/cacheService');
 const maskPlatinumBadge = (seeker, employerTier) => {
     const maskedSeeker = { ...seeker };
 
-    // FIX: Using correct EmployerTier enum names (SILVER_ACCESS, etc.)
     if (employerTier === 'SILVER_ACCESS' || employerTier === 'FREE') {
-        // SILVER ACCESS (Base Subscription)
+        // SILVER ACCESS / FREE (Base Subscription)
         maskedSeeker.phone = '********';
         maskedSeeker.email = '********';
-        maskedSeeker.nationalIdFayda = '********';
+        maskedSeeker.nationalIdUrl = null;
+        maskedSeeker.faydaId = null;
         maskedSeeker.guarantorName = '********';
         maskedSeeker.guarantorPhone = '********';
-        maskedSeeker.guarantorIdCard = null;
-        maskedSeeker.policeClearance = null;
-        maskedSeeker.healthCertificate = null;
+        maskedSeeker.guarantorIdUrl = null;
+        maskedSeeker.policeClearanceUrl = null;
+        maskedSeeker.healthCertificateUrl = null;
         maskedSeeker.idDocument = null;
 
         if (maskedSeeker.badge === 'GOLD' || maskedSeeker.badge === 'PLATINUM') {
@@ -27,8 +27,8 @@ const maskPlatinumBadge = (seeker, employerTier) => {
         }
     } else if (employerTier === 'GOLD_ACCESS') {
         // GOLD ACCESS (Mid-Tier Upgrade)
-        maskedSeeker.policeClearance = null;
-        maskedSeeker.healthCertificate = null;
+        maskedSeeker.policeClearanceUrl = null;
+        maskedSeeker.healthCertificateUrl = null;
 
         if (maskedSeeker.badge === 'PLATINUM') {
             maskedSeeker.badge = 'GOLD';
@@ -43,43 +43,52 @@ exports.getSeekerProfile = async (req, res) => {
         const userId = req.user.id;
         const userRole = req.user.role;
 
-        if (userRole === 'EMPLOYER') {
-            // Log the view
-            await prisma.viewLog.create({
-                data: {
-                    employerId: userId,
-                    targetJobSeekerId: id
-                }
-            });
-
-            // Fetch masked data from the view function for this specific seeker
-            const seekers = await prisma.$queryRaw`
-                SELECT * FROM get_seeker_visibility_with_id(${userId}::uuid)
-                WHERE id = ${id}::uuid
-                LIMIT 1
-            `;
-
-            if (!seekers || seekers.length === 0) return res.status(404).json({ error: 'Seeker not found' });
-
-            const seeker = seekers[0];
-            
-            // Calculate Trust Score on the fly for consistency
-            seeker.trustScore = calculateTrustScore(seeker);
-            
-            // Double-Key Access Control Masking
-            seeker.phone = req.hasPremiumAccess ? seeker.phone : '********';
-            seeker.email = req.hasPremiumAccess ? seeker.email : '********';
-            seeker.locationKebele = req.hasPremiumAccess ? seeker.locationKebele : '********';
-
-            return res.json(seeker);
-        }
-
-        // For Seekers/Admins, return the full profile
         const seeker = await prisma.jobSeeker.findUnique({
             where: { id }
         });
 
         if (!seeker) return res.status(404).json({ error: 'Seeker not found' });
+
+        if (userRole === 'EMPLOYER') {
+            // Log the view asynchronously
+            prisma.viewLog.create({
+                data: {
+                    employerId: userId,
+                    targetJobSeekerId: id
+                }
+            }).catch(e => console.warn('ViewLog error:', e.message));
+
+            const employer = await prisma.employer.findUnique({
+                where: { id: userId },
+                select: { tier: true, subscriptionExpiry: true }
+            });
+
+            const isSubscribed = employer?.subscriptionExpiry && new Date(employer.subscriptionExpiry) > new Date();
+            const employerTier = isSubscribed ? (employer?.tier || 'FREE') : 'FREE';
+
+            const masked = maskPlatinumBadge(seeker, employerTier);
+            masked.trustScore = calculateTrustScore(seeker);
+
+            // Double-Key Access Control Masking
+            const hasPremium = req.hasPremiumAccess || isSubscribed;
+            masked.phone = hasPremium ? seeker.phone : '********';
+            masked.email = hasPremium ? seeker.email : '********';
+            masked.locationKebele = hasPremium ? seeker.locationKebele : '********';
+
+            // Sensitive legal documents require verified status & paid access
+            if (!hasPremium || seeker.verificationStatus !== 'APPROVED') {
+                masked.nationalIdUrl = null;
+                masked.guarantorIdUrl = null;
+                masked.policeClearanceUrl = null;
+                masked.healthCertificateUrl = null;
+                masked.idDocument = null;
+            }
+
+            return res.json(masked);
+        }
+
+        // For Seekers/Admins, return full profile with trustScore
+        seeker.trustScore = calculateTrustScore(seeker);
         res.json(seeker);
     } catch (error) {
         console.error("Get profile error:", error);
@@ -189,29 +198,33 @@ exports.getAllSeekers = async (req, res) => {
         const userId = req.user.id;
         const userRole = req.user.role;
 
-        // Only cache for non-employers or generic list
-        const cacheKey = `seekers_${userRole}`;
-        const cached = cacheService.get(cacheKey);
-        if (cached) return res.json(cached);
+        const rawSeekers = await prisma.jobSeeker.findMany({
+            where: { isActive: true },
+            orderBy: { fullName: 'asc' }
+        });
 
-        let seekers;
+        let enrichedSeekers;
+
         if (userRole === 'EMPLOYER') {
-            seekers = await prisma.$queryRaw`
-                SELECT * FROM get_seeker_visibility_with_id(${userId}::uuid)
-                ORDER BY "fullName" ASC
-            `;
-        } else {
-            seekers = await prisma.jobSeeker.findMany({
-                orderBy: { fullName: 'asc' }
+            const employer = await prisma.employer.findUnique({
+                where: { id: userId },
+                select: { tier: true, subscriptionExpiry: true }
             });
+            const isSubscribed = employer?.subscriptionExpiry && new Date(employer.subscriptionExpiry) > new Date();
+            const employerTier = isSubscribed ? (employer?.tier || 'FREE') : 'FREE';
+
+            enrichedSeekers = rawSeekers.map(s => {
+                const masked = maskPlatinumBadge(s, employerTier);
+                masked.trustScore = calculateTrustScore(s);
+                return masked;
+            });
+        } else {
+            enrichedSeekers = rawSeekers.map(s => ({
+                ...s,
+                trustScore: calculateTrustScore(s)
+            }));
         }
 
-        const enrichedSeekers = seekers.map(s => ({
-            ...s,
-            trustScore: calculateTrustScore(s)
-        }));
-
-        cacheService.set(cacheKey, enrichedSeekers, 300000); // 5 minutes
         res.json(enrichedSeekers);
     } catch (error) {
         res.status(500).json({ error: error.message });

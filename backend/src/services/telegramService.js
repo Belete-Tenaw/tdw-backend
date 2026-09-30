@@ -46,6 +46,44 @@ class TelegramService {
     }
 
     /**
+     * Send a message with inline keyboard button(s).
+     * @param {string} chatId
+     * @param {string} text
+     * @param {object|object[]} buttons - { text, url } or array of rows
+     */
+    async sendMessageWithButton(chatId, text, buttons) {
+        if (!this.botToken) {
+            console.warn('[TelegramService] Token not configured. Mocking sendMessageWithButton.');
+            return true;
+        }
+        if (!chatId) {
+            console.error('[TelegramService] Cannot send without chatId');
+            return false;
+        }
+
+        // Normalise to inline_keyboard 2D array
+        let inline_keyboard;
+        if (Array.isArray(buttons)) {
+            inline_keyboard = buttons.map(b => Array.isArray(b) ? b : [b]);
+        } else {
+            inline_keyboard = [[buttons]];
+        }
+
+        try {
+            const response = await axios.post(`${this.baseUrl}/sendMessage`, {
+                chat_id: chatId,
+                text,
+                parse_mode: 'HTML',
+                reply_markup: { inline_keyboard }
+            });
+            return response.data.ok;
+        } catch (error) {
+            console.error(`[TelegramService] sendMessageWithButton error to ${chatId}:`, error.message);
+            return false;
+        }
+    }
+
+    /**
      * Send revenue/payment alerts to the platform admin
      */
     async notifyAdmin(text) {
@@ -55,6 +93,16 @@ class TelegramService {
             return false;
         }
         return await this.sendMessage(adminChatId, `💰 <b>Revenue Alert</b>\n\n${text}`);
+    }
+
+    /**
+     * Send a rich structured admin alert with action button.
+     */
+    async notifyAdminRich(text, buttonLabel = '🔍 View in Admin', buttonUrl = null) {
+        const adminChatId = process.env.ADMIN_TELEGRAM_CHAT_ID;
+        if (!adminChatId) return false;
+        const url = buttonUrl || (process.env.CLIENT_URL || 'https://trustworthydomesticworkers.web.app') + '/admin';
+        return await this.sendMessageWithButton(adminChatId, text, { text: buttonLabel, url });
     }
 }
 

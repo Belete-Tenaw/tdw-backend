@@ -34,7 +34,7 @@ module.exports = async (req, res, next) => {
             
             if (decoded.role === 'JOB_SEEKER') {
                 user = await prisma.jobSeeker.findUnique({ where: { id: decoded.id }, select: selectFields });
-            } else if (decoded.role === 'EMPLOYER') {
+            } else if (decoded.role === 'EMPLOYER' || decoded.role === 'AGENCY') {
                 user = await prisma.employer.findUnique({ where: { id: decoded.id }, select: selectFields });
             }
 

@@ -25,7 +25,7 @@ const EscrowTracker = ({ escrow, userRole, onUpdate }) => {
         }
     };
 
-    const isReleased = escrow.status === 'RELEASED_TO_SEEKER';
+    const isReleased = escrow.status === 'RELEASED';
 
     return (
         <div style={{ background: 'white', borderRadius: '16px', border: '1px solid #e5e7eb', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>

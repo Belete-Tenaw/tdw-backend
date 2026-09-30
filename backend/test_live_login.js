@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 async function testLogin() {
-    const url = 'https://edwl-backend.onrender.com/api/auth/admin/login';
+    const url = 'https://edwl-backend-1.onrender.com/api/auth/admin/login';
     const credentials = {
         username: 'EDWL2026',
         password: 'TwaBel2026'

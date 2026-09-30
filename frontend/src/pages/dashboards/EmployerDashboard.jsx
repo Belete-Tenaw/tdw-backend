@@ -56,6 +56,11 @@ const EmployerDashboard = () => {
     };
 
     useEffect(() => {
+        if (!user || !user.id) {
+            navigate('/login');
+            return;
+        }
+
         const fetchDashboardData = async () => {
             try {
                 const [workersRes, jobsRes, profileRes, contractsRes, escrowRes] = await Promise.all([
@@ -65,11 +70,11 @@ const EmployerDashboard = () => {
                     api.get('/contracts'),
                     api.get('/escrow')
                 ]);
-                setWorkers(workersRes.data);
+                setWorkers(workersRes.data || []);
                 setMyJobs(jobsRes.data || []);
                 setContracts(contractsRes.data || []);
                 setEscrows(escrowRes.data || []);
-                if (profileRes.data.verificationStatus === 'PENDING') {
+                if (profileRes.data?.verificationStatus === 'PENDING') {
                     setPendingVerification(true);
                 }
             } catch (err) {
@@ -80,7 +85,7 @@ const EmployerDashboard = () => {
             }
         };
         fetchDashboardData();
-    }, []);
+    }, [user?.id, navigate, t]);
 
     const fetchMatches = async (jobId) => {
         setLoading(true);

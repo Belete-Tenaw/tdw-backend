@@ -9,6 +9,24 @@ if (!token) {
     const bot = new TelegramBot(token, { polling: true });
     const codeController = require('../controllers/codeController');
 
+    const baseUrl = process.env.CLIENT_URL || process.env.BASE_URL || 'https://trustworthydomesticworkers.web.app';
+    const miniAppUrl = `${baseUrl.replace(/\/$/, '')}/tma`;
+
+    // Configure the Telegram WebApp Menu Button for all users
+    try {
+        if (typeof bot.setChatMenuButton === 'function') {
+            bot.setChatMenuButton({
+                menu_button: {
+                    type: 'web_app',
+                    text: '🚀 Open TDW',
+                    web_app: { url: miniAppUrl }
+                }
+            }).catch(err => console.warn('[TelegramBot] Menu button setup note:', err.message));
+        }
+    } catch (btnErr) {
+        console.warn('[TelegramBot] Menu button not supported in this environment:', btnErr.message);
+    }
+
     /**
      * Listener for the /start command.
      * Expected format: /start [userId]
@@ -23,20 +41,36 @@ if (!token) {
             const seeker = await prisma.jobSeeker.findUnique({ where: { id: userId } });
             const employer = await prisma.employer.findUnique({ where: { id: userId } });
 
+            const miniAppKeyboard = {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🚀 Open TDW Mini-App', web_app: { url: miniAppUrl } }]
+                    ]
+                }
+            };
+
             if (seeker) {
                 await prisma.jobSeeker.update({
                     where: { id: userId },
                     data: { telegramChatId: chatId }
                 });
-                bot.sendMessage(chatId, `🎉 <b>Welcome ${seeker.fullName}!</b>\n\nYour TDW account is now linked to Telegram. You will receive real-time alerts for tier upgrades and subscriptions.`, { parse_mode: 'HTML' });
+                bot.sendMessage(
+                    chatId,
+                    `🎉 <b>Welcome ${seeker.fullName}!</b>\n\nYour TDW account is now linked to Telegram. You can manage your profile, view jobs, and receive real-time notifications directly inside Telegram.`,
+                    { parse_mode: 'HTML', ...miniAppKeyboard }
+                );
             } else if (employer) {
                 await prisma.employer.update({
                     where: { id: userId },
                     data: { telegramChatId: chatId }
                 });
-                bot.sendMessage(chatId, `🎉 <b>Welcome ${employer.contactName}!</b>\n\nYour TDW account is now linked to Telegram. You will receive real-time alerts.`, { parse_mode: 'HTML' });
+                bot.sendMessage(
+                    chatId,
+                    `🎉 <b>Welcome ${employer.contactName}!</b>\n\nYour TDW account is now linked to Telegram. You can browse verified workers, post jobs, and manage hires inside the Mini-App.`,
+                    { parse_mode: 'HTML', ...miniAppKeyboard }
+                );
             } else {
-                bot.sendMessage(chatId, '❌ User not found. Please ensure you clicked the link from the TDW platform.');
+                bot.sendMessage(chatId, '❌ User not found. Please ensure you clicked the link from the TDW platform.', miniAppKeyboard);
             }
 
         } catch (error) {
@@ -47,7 +81,35 @@ if (!token) {
 
     // Generic welcome if no user ID provided
     bot.onText(/\/start$/, (msg) => {
-        bot.sendMessage(msg.chat.id, "👋 Welcome to <b>Trustworthy Domestic Workers (TDW)</b>.\n\nPlease link your account from the dashboard to receive notifications.", { parse_mode: 'HTML' });
+        bot.sendMessage(
+            msg.chat.id,
+            "👋 Welcome to <b>Trustworthy Domestic Workers (TDW)</b>.\n\nታማኝ የቤት ውስጥ ሠራተኞች መድረክ። Connect with verified domestic helpers or explore job opportunities directly inside Telegram!",
+            {
+                parse_mode: 'HTML',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🚀 Launch TDW Mini-App', web_app: { url: miniAppUrl } }],
+                        [{ text: '📋 View Recent Jobs', callback_data: 'view_jobs' }]
+                    ]
+                }
+            }
+        );
+    });
+
+    // Mini-app explicit command
+    bot.onText(/\/(app|miniapp)/, (msg) => {
+        bot.sendMessage(
+            msg.chat.id,
+            "✨ <b>TDW Telegram Mini-App</b>\n\nTap the button below to browse verified workers and jobs in Addis Ababa and across Ethiopia:",
+            {
+                parse_mode: 'HTML',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🚀 Open Mini-App Now', web_app: { url: miniAppUrl } }]
+                    ]
+                }
+            }
+        );
     });
 
     // ================================
@@ -158,7 +220,14 @@ if (!token) {
                 responseText += `${idx + 1}. <b>${j.title}</b>\n💰 Salary: ${j.salaryOffered} ETB\n📍 Location: ${j.address || j.locationRegion || 'Addis Ababa'}\n\n`;
             });
 
-            bot.sendMessage(chatId, responseText, { parse_mode: 'HTML' });
+            bot.sendMessage(chatId, responseText, {
+                parse_mode: 'HTML',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '🔍 Open in TDW Mini-App', web_app: { url: miniAppUrl } }]
+                    ]
+                }
+            });
         } catch (err) {
             console.error('[TelegramBot Jobs Error]', err);
             bot.sendMessage(chatId, '❌ Failed to fetch job listings.');

@@ -183,74 +183,67 @@ exports.getMatchesForJob = async (req, res) => {
 
         const job = await prisma.jobPost.findUnique({
             where: { id },
-            select: { salaryOffered: true }
+            include: { employer: true }
         });
         
         if (!job) {
             return res.status(404).json({ error: 'Job not found' });
         }
 
-        // Use raw query to call the weighted matching function
-        // This function calculates scores based on skills, location, and tier.
-        const matches = await prisma.$queryRawUnsafe(
-            `SELECT * FROM match_seekers_for_job($1::uuid)`,
-            id
-        );
+        const smartMatchEngine = require('../services/smartMatchEngine');
+        const employer = await prisma.employer.findUnique({ 
+            where: { id: req.user.id }, 
+            select: { tier: true, subscriptionExpiry: true } 
+        });
+        const isSubscribed = employer?.subscriptionExpiry && new Date(employer.subscriptionExpiry) > new Date();
+        const employerTier = isSubscribed ? (employer?.tier || 'FREE') : 'FREE';
 
-        if (matches.length === 0) {
-            return res.json([]);
-        }
+        // Compute top matches using the multi-parametric smart match engine
+        const candidates = await smartMatchEngine.findTopCandidatesForJob(id, 30);
 
-        // Fetch full masked profiles using the new SQL function
-        const matchedIds = matches.map(m => m.seeker_id);
-        const employer = await prisma.employer.findUnique({ where: { id: req.user.id }, select: { tier: true } });
-        const employerTier = employer?.tier || 'FREE';
-
-        const enrichedMatches = await Promise.all(matches.map(async (match) => {
-            const [profile] = await prisma.$queryRawUnsafe(
-                `SELECT get_seeker_visibility_with_id($1::uuid, $2::text) as data`,
-                match.seeker_id,
-                employerTier
-            );
+        const enrichedMatches = candidates.map(item => {
+            const seeker = item.seeker;
+            const matchScore = item.compatibilityScore;
             
-            const profileData = profile.data;
-            if (!profileData) return null;
-
-            // 🎯 Generate Smart Insights V2
+            // Mask contact details based on employer tier
+            const hasContactAccess = employerTier !== 'FREE';
+            
             const insights = [];
-            if (match.match_score >= 90) insights.push("Exceptional Match");
-            else if (match.match_score >= 80) insights.push("Strong Skill Fit");
+            if (matchScore >= 85) insights.push("Exceptional Match");
+            else if (matchScore >= 70) insights.push("Strong Skill Fit");
             
-            if (profileData.behaviorScore >= 90) insights.push("Highly Reliable");
-            if (profileData.isFaydaVerified) insights.push("Identity Verified");
-            if (profileData.experienceYears >= 5) insights.push("Veteran Experience");
-            if (profileData.completedJobs >= 10) insights.push("Platform Expert");
-            if (profileData.responseTimeMs && profileData.responseTimeMs < 3600000) insights.push("Quick Responder");
-            
-            // Economic Insight
-            if (profileData.expectedSalary <= job.salaryOffered) insights.push("Budget Friendly");
-            
-            // 2026 World Class Reference: Stability Indicator
-            if (profileData.completedJobs > 0 && profileData.rating >= 4.5) {
-                insights.push("High Retention Rate");
+            if (seeker.isFaydaVerified) insights.push("Fayda Verified");
+            if (seeker.experienceYears >= 3) insights.push("Experienced Pro");
+            if (seeker.rating >= 4.5) insights.push("Top Rated Worker");
+            if (item.breakdown?.some(b => b.factor === 'Location' && b.points >= 20)) {
+                insights.push("Neighborhood Proximity");
             }
 
-            // Add Trust Score for global context
-            profileData.trustScore = calculateTrustScore(profileData);
-
             return {
-                ...profileData,
-                match_score: Math.round(match.match_score),
-                matchInsights: insights
+                id: seeker.id,
+                seeker_id: seeker.id,
+                fullName: hasContactAccess ? seeker.fullName : (seeker.fullName ? seeker.fullName.split(' ')[0] + ' ***' : 'Verified Worker'),
+                full_name: hasContactAccess ? seeker.fullName : (seeker.fullName ? seeker.fullName.split(' ')[0] + ' ***' : 'Verified Worker'),
+                profilePhoto: seeker.profilePhoto,
+                skills: seeker.skills || [],
+                experienceYears: seeker.experienceYears || 0,
+                preferredLocation: seeker.preferredLocation || 'Addis Ababa',
+                preferredArrangement: seeker.preferredArrangement,
+                rating: seeker.rating || 5.0,
+                tier: seeker.tier || 'BRONZE',
+                badge: seeker.badge || 'STANDARD',
+                display_tier: seeker.tier || 'BRONZE',
+                isVerified: seeker.isVerified,
+                isFaydaVerified: seeker.isFaydaVerified,
+                match_score: matchScore,
+                compatibilityScore: matchScore,
+                matchInsights: insights,
+                breakdown: item.breakdown,
+                is_visible: true
             };
-        }));
+        });
 
-        const finalMatches = enrichedMatches.filter(m => m !== null);
-        
-        // Final sort by match score descending
-        finalMatches.sort((a, b) => b.match_score - a.match_score);
-
-        res.json(finalMatches);
+        res.json(enrichedMatches);
     } catch (error) {
         console.error("Smart Matching error:", error);
         res.status(500).json({ error: "Failed to calculate matching seekers" });
@@ -263,7 +256,7 @@ exports.getMatchesForJob = async (req, res) => {
  */
 exports.getSmartCandidatesForJob = async (req, res) => {
     try {
-        const { jobId } = req.params;
+        const jobId = req.params.jobId || req.params.id;
         const smartMatchEngine = require('../services/smartMatchEngine');
         const candidates = await smartMatchEngine.findTopCandidatesForJob(jobId, 15);
         res.json({

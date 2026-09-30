@@ -148,7 +148,15 @@ exports.registerJobSeeker = async (req, res, next) => {
         res.status(201).json({ 
             message: "Job Seeker registered successfully", 
             userId: newSeeker.id,
-            token 
+            token,
+            user: {
+                id: newSeeker.id,
+                name: newSeeker.fullName,
+                role: 'JOB_SEEKER',
+                tier: newSeeker.tier,
+                referralCode: newSeeker.referralCode,
+                referralCount: newSeeker.referralCount || 0
+            }
         });
 
         // Audit Log
@@ -297,7 +305,15 @@ exports.registerEmployer = async (req, res, next) => {
         res.status(201).json({
             message: "Employer registered successfully",
             userId: newEmployer.id,
-            token
+            token,
+            user: {
+                id: newEmployer.id,
+                name: newEmployer.contactName,
+                role: 'EMPLOYER',
+                tier: newEmployer.tier,
+                referralCode: newEmployer.referralCode,
+                referralCount: newEmployer.referralCount || 0
+            }
         });
 
         // Audit Log
@@ -608,3 +624,43 @@ exports.markAllNotificationsRead = async (req, res) => {
     }
 };
 
+/**
+ * Store or clear a user's FCM device token for push notifications.
+ * Called by the frontend on every successful login.
+ * PATCH /api/auth/fcm-token
+ * Body: { fcmToken: string | null }
+ */
+exports.updateFcmToken = async (req, res) => {
+    try {
+        const { fcmToken } = req.body;
+        const userId   = req.user.id;
+        const userRole = req.user.role;
+
+        // Update the correct model based on role
+        if (userRole === 'JOB_SEEKER') {
+            await prisma.jobSeeker.update({
+                where: { id: userId },
+                data:  { fcmToken: fcmToken || null }
+            });
+        } else if (userRole === 'EMPLOYER') {
+            await prisma.employer.update({
+                where: { id: userId },
+                data:  { fcmToken: fcmToken || null }
+            });
+        } else if (userRole === 'ADMIN') {
+            await prisma.admin.update({
+                where: { id: userId },
+                data:  { fcmToken: fcmToken || null }
+            });
+        }
+
+        res.json({ success: true, message: 'FCM token updated.' });
+    } catch (error) {
+        // Gracefully ignore unknown field errors — fcmToken column may not be migrated yet
+        if (error.code === 'P2025') {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        console.error('[FCM Token] Update failed:', error.message);
+        res.status(500).json({ error: 'Failed to update FCM token.' });
+    }
+};

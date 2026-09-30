@@ -4,7 +4,7 @@ const prisma = require('../utils/prisma');
 exports.initiateEscrow = async (req, res) => {
     try {
         const { contractId, amount } = req.body;
-        const employerId = req.user.userId;
+        const employerId = req.user.id || req.user.userId;
 
         const contract = await prisma.contract.findUnique({
             where: { id: contractId }
@@ -17,20 +17,15 @@ exports.initiateEscrow = async (req, res) => {
         // Create Escrow Record
         const escrow = await prisma.escrowContract.create({
             data: {
-                contractId,
                 employerId,
-                jobSeekerId: contract.jobSeekerId,
+                workerId: contract.jobSeekerId,
+                jobId: contract.jobPostId,
                 amount: parseFloat(amount),
-                status: 'HELD_IN_ESCROW'
+                status: 'FUNDED'
             }
         });
 
-        // Update Contract status
-        await prisma.contract.update({
-            where: { id: contractId },
-            data: { status: 'ACTIVE_WITH_ESCROW' }
-        });
-
+        // Add a note to contract or change its status (we keep it optional)
         res.status(201).json({ message: "Funds held in escrow successfully.", escrow });
     } catch (error) {
         console.error("Initiate escrow error:", error);
@@ -42,7 +37,7 @@ exports.initiateEscrow = async (req, res) => {
 exports.releaseEscrow = async (req, res) => {
     try {
         const { escrowId } = req.params;
-        const employerId = req.user.userId;
+        const employerId = req.user.id || req.user.userId;
 
         const escrow = await prisma.escrowContract.findUnique({
             where: { id: escrowId }
@@ -52,22 +47,15 @@ exports.releaseEscrow = async (req, res) => {
             return res.status(404).json({ error: "Escrow record not found or unauthorized." });
         }
 
-        if (escrow.status !== 'HELD_IN_ESCROW') {
+        if (escrow.status !== 'FUNDED') {
             return res.status(400).json({ error: `Cannot release funds in ${escrow.status} status.` });
         }
 
         const updatedEscrow = await prisma.escrowContract.update({
             where: { id: escrowId },
             data: {
-                status: 'RELEASED_TO_SEEKER',
-                releasedAt: new Date()
+                status: 'RELEASED'
             }
-        });
-
-        // Update Contract status to COMPLETED
-        await prisma.contract.update({
-            where: { id: escrow.contractId },
-            data: { status: 'COMPLETED' }
         });
 
         res.json({ message: "Funds released to worker successfully.", escrow: updatedEscrow });

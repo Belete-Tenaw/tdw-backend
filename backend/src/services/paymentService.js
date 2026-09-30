@@ -49,6 +49,10 @@ class PaymentService {
             user = await prisma.employer.findUnique({ where: { id: userId } });
         }
 
+        if (!user) {
+            throw new Error('User account not found');
+        }
+
         const payment = await prisma.payment.create({
             data: {
                 amount: tier.priceETB,

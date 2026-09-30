@@ -2,10 +2,11 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../services/api';
 import authService from '../services/authService';
-import { Send, User, MessageSquare, Keyboard, Shield } from 'lucide-react';
+import { Send, User, MessageSquare, Keyboard, Shield, Mic, MicOff, Volume2, Square, X, Check, AlertTriangle, ShieldOff } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { transliterate } from '../utils/amharicTranslit';
 import PanicButton from '../components/PanicButton';
+import socket from '../services/socket';
 
 const Messages = () => {
     const { t } = useTranslation();
@@ -16,16 +17,37 @@ const Messages = () => {
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
     const [sendError, setSendError] = useState('');
+    const [fraudWarning, setFraudWarning] = useState(null);
     const currentUser = authService.getCurrentUser();
-    const scrollRef = useRef(null);
     const [amharicMode, setAmharicMode] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingSeconds, setRecordingSeconds] = useState(0);
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
+    const recordingTimerRef = useRef(null);
+    const scrollRef = useRef(null);
 
-    // Fetch all messages and group them by user to form "conversations"
+    // ━━━ Real-time Socket Listener + initial fetch ━━━
     useEffect(() => {
         fetchMessages();
-        const interval = setInterval(fetchMessages, 5000); // Poll every 5 seconds
-        return () => clearInterval(interval);
-    }, []);
+
+        // Prefer socket over polling when available
+        if (socket && currentUser?.id) {
+            socket.emit('join', currentUser.id);
+            socket.on('new_message', (msg) => {
+                setChatHistory(prev => {
+                    // Avoid duplicates (optimistic vs. server echo)
+                    if (prev.find(m => m.id === msg.id)) return prev;
+                    return [...prev, msg];
+                });
+            });
+            return () => socket.off('new_message');
+        } else {
+            // Fallback: poll every 5s when no socket
+            const interval = setInterval(fetchMessages, 5000);
+            return () => clearInterval(interval);
+        }
+    }, [currentUser?.id]);
 
     useEffect(() => {
         if (location.state?.startChatWith) {
@@ -141,24 +163,37 @@ const Messages = () => {
         e.preventDefault();
         if (!newMessage.trim() || !selectedUser) return;
 
+        setFraudWarning(null);
+        setSendError('');
+
         try {
             const receiverType = currentUser.role === 'JOB_SEEKER' ? 'EMPLOYER' : 'JOB_SEEKER';
-
-            const payload = {
-                receiverId: selectedUser.id,
-                receiverType,
-                content: newMessage
-            };
+            const payload = { receiverId: selectedUser.id, receiverType, content: newMessage };
 
             const res = await api.post('/messages', payload);
             const newMsg = res.data;
-            setChatHistory([...chatHistory, newMsg]);
+
+            // Show fraud warning if backend flagged medium risk (but message was allowed)
+            if (newMsg.fraudWarning) {
+                setFraudWarning(newMsg.fraudWarning);
+                setTimeout(() => setFraudWarning(null), 8000);
+            }
+
+            // Optimistically append (socket will also push it; dedup handled)
+            setChatHistory(prev => prev.find(m => m.id === newMsg.id) ? prev : [...prev, newMsg]);
             setNewMessage('');
-            setSendError('');
-            fetchMessages();
         } catch (err) {
-            const msg = err.response?.data?.message || err.response?.data?.error || 'Failed to send message.';
-            setSendError(msg);
+            const errData = err.response?.data;
+            if (errData?.fraudRisk === 'HIGH') {
+                // Blocked by anti-poaching shield
+                setSendError(
+                    `🛡️ Blocked: ${errData.reason || 'Message contains off-platform contact info.'} ` +
+                    `(${(errData.flaggedPatterns || []).join('; ')})`
+                );
+            } else {
+                const msg = errData?.message || errData?.error || 'Failed to send message.';
+                setSendError(msg);
+            }
         }
     };
 
@@ -172,6 +207,73 @@ const Messages = () => {
             }
         }
         setNewMessage(val);
+    };
+
+    const startRecording = async () => {
+        try {
+            setSendError('');
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorderRef.current = new MediaRecorder(stream);
+            audioChunksRef.current = [];
+
+            mediaRecorderRef.current.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) {
+                    audioChunksRef.current.push(e.data);
+                }
+            };
+
+            mediaRecorderRef.current.onstop = () => {
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorderRef.current.start();
+            setIsRecording(true);
+            setRecordingSeconds(0);
+            recordingTimerRef.current = setInterval(() => {
+                setRecordingSeconds(s => s + 1);
+            }, 1000);
+        } catch (err) {
+            setSendError('Microphone permission is required to record voice messages.');
+        }
+    };
+
+    const cancelRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+            clearInterval(recordingTimerRef.current);
+            audioChunksRef.current = [];
+        }
+    };
+
+    const stopAndSendVoiceNote = () => {
+        if (!mediaRecorderRef.current || !isRecording) return;
+
+        mediaRecorderRef.current.onstop = async () => {
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = async () => {
+                const base64Audio = reader.result;
+                try {
+                    const receiverType = currentUser.role === 'JOB_SEEKER' ? 'EMPLOYER' : 'JOB_SEEKER';
+                    const payload = {
+                        receiverId: selectedUser.id,
+                        receiverType,
+                        content: `[VOICE_NOTE]:${base64Audio}`
+                    };
+                    const res = await api.post('/messages', payload);
+                    setChatHistory(prev => [...prev, res.data]);
+                    fetchMessages();
+                } catch (err) {
+                    setSendError('Failed to send voice message.');
+                }
+            };
+        };
+
+        mediaRecorderRef.current.stop();
+        setIsRecording(false);
+        clearInterval(recordingTimerRef.current);
     };
 
     return (
@@ -268,7 +370,20 @@ const Messages = () => {
                                             color: isMe ? 'white' : '#333',
                                             borderRadius: isMe ? '12px 12px 0 12px' : '12px 12px 12px 0'
                                         }}>
-                                            {msg.content}
+                                            {msg.content?.startsWith('[VOICE_NOTE]:') ? (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                    <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', opacity: 0.9 }}>
+                                                        <Volume2 size={14} /> Voice Note (የድምጽ መልዕክት)
+                                                    </div>
+                                                    <audio
+                                                        controls
+                                                        src={msg.content.replace('[VOICE_NOTE]:', '')}
+                                                        style={{ maxWidth: '240px', height: '36px' }}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                msg.content
+                                            )}
                                         </div>
                                         {msg.timestamp && (
                                             <div style={{ fontSize: '0.7rem', color: '#999', marginTop: '4px', textAlign: isMe ? 'right' : 'left' }}>
@@ -282,8 +397,25 @@ const Messages = () => {
 
                         <form onSubmit={handleSendMessage} style={{ padding: '15px', borderTop: '1px solid #eee', background: '#fff' }}>
                             {sendError && (
-                                <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '8px 12px', borderRadius: '8px', marginBottom: '10px', fontSize: '0.9rem' }}>
-                                    {sendError}
+                                <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '10px 14px', borderRadius: '8px', marginBottom: '10px', fontSize: '0.85rem', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                                    <ShieldOff size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                    <span>{sendError}</span>
+                                </div>
+                            )}
+                            {fraudWarning && (
+                                <div style={{ background: '#fff7ed', border: '1px solid #fb923c', color: '#9a3412', padding: '10px 14px', borderRadius: '8px', marginBottom: '10px', fontSize: '0.82rem', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                                    <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: '2px', color: '#f97316' }} />
+                                    <div>
+                                        <strong>⚠️ Safety Reminder:</strong> {fraudWarning.warning}
+                                        {fraudWarning.flaggedPatterns?.length > 0 && (
+                                            <div style={{ marginTop: '4px', opacity: 0.8, fontSize: '0.78rem' }}>
+                                                Detected: {fraudWarning.flaggedPatterns.join(' • ')}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button onClick={() => setFraudWarning(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#9a3412', flexShrink: 0 }}>
+                                        <X size={14} />
+                                    </button>
                                 </div>
                             )}
 
@@ -334,16 +466,90 @@ const Messages = () => {
                                         <Keyboard size={12} /> {amharicMode ? 'Amharic ON' : 'Easy Amharic'}
                                     </button>
                                 </div>
-                                <div style={{ display: 'flex', gap: '10px' }}>
-                                    <input
-                                        style={{ flex: 1, padding: '12px', borderRadius: '25px', border: '1px solid #ddd', outline: 'none' }}
-                                        placeholder={t('type_message')}
-                                        value={newMessage}
-                                        onChange={handleMessageChange}
-                                    />
-                                    <button disabled={!newMessage.trim()} type="submit" style={{ width: '45px', height: '45px', borderRadius: '50%', background: 'var(--primary)', border: 'none', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'transform 0.1s', transform: newMessage.trim() ? 'scale(1.05)' : 'scale(1)' }}>
-                                        <Send size={20} />
-                                    </button>
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                    {isRecording ? (
+                                        <div style={{
+                                            flex: 1,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            background: '#fee2e2',
+                                            padding: '8px 16px',
+                                            borderRadius: '25px',
+                                            border: '1px solid #fca5a5'
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b91c1c', fontWeight: '600', fontSize: '0.9rem' }}>
+                                                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444', animation: 'pulse 1s infinite' }} />
+                                                Recording... {Math.floor(recordingSeconds / 60)}:{(recordingSeconds % 60).toString().padStart(2, '0')}
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                                <button
+                                                    type="button"
+                                                    onClick={cancelRecording}
+                                                    title="Cancel Recording"
+                                                    style={{ background: 'white', border: '1px solid #f87171', color: '#b91c1c', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                                >
+                                                    <X size={16} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={stopAndSendVoiceNote}
+                                                    title="Send Voice Note"
+                                                    style={{ background: '#0f766e', border: 'none', color: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                                                >
+                                                    <Check size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <input
+                                                style={{ flex: 1, padding: '12px', borderRadius: '25px', border: '1px solid #ddd', outline: 'none' }}
+                                                placeholder={t('type_message')}
+                                                value={newMessage}
+                                                onChange={handleMessageChange}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={startRecording}
+                                                title="Record Voice Note"
+                                                style={{
+                                                    width: '45px',
+                                                    height: '45px',
+                                                    borderRadius: '50%',
+                                                    background: '#f1f5f9',
+                                                    border: '1px solid #cbd5e1',
+                                                    color: '#0f766e',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                <Mic size={20} />
+                                            </button>
+                                            <button
+                                                disabled={!newMessage.trim()}
+                                                type="submit"
+                                                style={{
+                                                    width: '45px',
+                                                    height: '45px',
+                                                    borderRadius: '50%',
+                                                    background: 'var(--primary)',
+                                                    border: 'none',
+                                                    color: 'white',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: 'pointer',
+                                                    transition: 'transform 0.1s',
+                                                    transform: newMessage.trim() ? 'scale(1.05)' : 'scale(1)'
+                                                }}
+                                            >
+                                                <Send size={20} />
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </form>

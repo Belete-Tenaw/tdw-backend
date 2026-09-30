@@ -109,6 +109,26 @@ class AttendanceService {
         });
         return shifts;
     }
+
+    /**
+     * Gets the currently active shift for a given contract.
+     */
+    async getActiveShift(contractId) {
+        return await prisma.transitSession.findFirst({
+            where: { contractId, isActive: true }
+        });
+    }
+
+    /**
+     * Gets shift records specifically for a contract.
+     */
+    async getContractShifts(contractId) {
+        return await prisma.transitSession.findMany({
+            where: { contractId },
+            orderBy: { updatedAt: 'desc' },
+            take: 30
+        });
+    }
 }
 
 module.exports = new AttendanceService();

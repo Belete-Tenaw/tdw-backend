@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const { uploadFileToFirebase } = require('../services/firebaseStorageService');
 
 exports.updateProfile = async (req, res) => {
     try {
@@ -7,9 +8,16 @@ exports.updateProfile = async (req, res) => {
 
         const { contactName, address, familySize } = req.body;
 
-        // Extract file paths - FIXED: Removed leading /
-        const profilePhotoPath = req.files?.profilePhoto ? `uploads/profilePhoto/${req.files.profilePhoto[0].filename}` : undefined;
-        const idDocumentPath = req.files?.idDocument ? `uploads/idDocument/${req.files.idDocument[0].filename}` : undefined;
+        let profilePhotoPath;
+        let idDocumentPath;
+
+        if (req.files?.profilePhoto) {
+            profilePhotoPath = (await uploadFileToFirebase(req.files.profilePhoto[0], 'profile-photos', true)).publicUrl;
+        }
+
+        if (req.files?.idDocument) {
+            idDocumentPath = (await uploadFileToFirebase(req.files.idDocument[0], 'legal-docs', false)).storagePath;
+        }
 
         // If ID document is updated, reset verification status
         let verificationData = {};
@@ -20,16 +28,19 @@ exports.updateProfile = async (req, res) => {
             };
         }
 
+        const updateData = {
+            contactName,
+            address,
+            familySize: familySize ? parseInt(familySize) : undefined,
+            ...verificationData
+        };
+
+        if (profilePhotoPath) updateData.profilePhoto = profilePhotoPath;
+        if (idDocumentPath) updateData.idDocument = idDocumentPath;
+
         const updated = await prisma.employer.update({
             where: { id },
-            data: {
-                contactName,
-                address,
-                familySize: familySize ? parseInt(familySize) : undefined,
-                profilePhoto: profilePhotoPath,
-                idDocument: idDocumentPath,
-                ...verificationData
-            }
+            data: updateData
         });
 
         res.json(updated);

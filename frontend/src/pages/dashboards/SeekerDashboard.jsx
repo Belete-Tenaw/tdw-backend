@@ -81,6 +81,11 @@ const SeekerDashboard = () => {
     };
 
     useEffect(() => {
+        if (!user || !user.id) {
+            navigate('/login');
+            return;
+        }
+
         const fetchData = async () => {
             try {
                 const [jobsRes, profileRes, contractsRes, escrowRes] = await Promise.all([
@@ -93,14 +98,14 @@ const SeekerDashboard = () => {
                 setContracts(contractsRes.data || []);
                 setEscrows(escrowRes.data || []);
                 // Smart Sort: Verified Employers and Jobs with higher Salary first
-                const sortedJobs = jobsRes.data.sort((a, b) => {
+                const sortedJobs = (jobsRes.data || []).sort((a, b) => {
                     if (a.employer?.isVerified && !b.employer?.isVerified) return -1;
                     if (!a.employer?.isVerified && b.employer?.isVerified) return 1;
-                    return b.salaryOffered - a.salaryOffered;
+                    return (b.salaryOffered || 0) - (a.salaryOffered || 0);
                 });
 
                 setJobs(sortedJobs);
-                if (profileRes.data.verificationStatus === 'PENDING') {
+                if (profileRes.data?.verificationStatus === 'PENDING') {
                     setPendingVerification(true);
                 }
             } catch (err) {
@@ -111,7 +116,7 @@ const SeekerDashboard = () => {
             }
         };
         fetchData();
-    }, [user.id, t]);
+    }, [user?.id, t, navigate]);
 
     const filteredJobs = jobs.filter(job => {
         const matchesSearch = (job.title || '').toLowerCase().includes(searchTerm.toLowerCase()) || 

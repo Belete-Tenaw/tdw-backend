@@ -18,7 +18,11 @@ const authService = {
         const response = await api.post(endpoint, data);
         if (response.data.token) {
             localStorage.setItem('token', response.data.token);
-            localStorage.setItem('user', JSON.stringify(response.data.user));
+            const userObj = response.data.user || {
+                id: response.data.userId,
+                role: type === 'seeker' ? 'JOB_SEEKER' : 'EMPLOYER'
+            };
+            localStorage.setItem('user', JSON.stringify(userObj));
         }
         return response.data;
     },

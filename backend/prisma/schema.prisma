@@ -79,6 +79,7 @@ model JobSeeker {
   liveSelfieUrl        String?
   behaviorScore        Float                 @default(50.0)
   responseTimeMs       Int?
+  fcmToken             String?               // FCM device token for push notifications
   auditLogs            AuditLog[]
   contracts            Contract[]
   disputes             Dispute[]             @relation("ReportedByJS")
@@ -152,6 +153,7 @@ model Employer {
   liveSelfieUrl        String?
   behaviorScore        Float                 @default(50.0)
   responseTimeMs       Int?
+  fcmToken             String?               // FCM device token for push notifications
   auditLogs            AuditLog[]
   contracts            Contract[]
   disputes             Dispute[]             @relation("ReportedByEmp")
@@ -458,6 +460,7 @@ model Admin {
   username  String     @unique
   password  String
   role      AdminRole  @default(MODERATOR)
+  fcmToken  String?                          // FCM device token for push notifications
   auditLogs AuditLog[]
   disputes  Dispute[]
 }

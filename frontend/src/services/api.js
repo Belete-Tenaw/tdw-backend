@@ -1,9 +1,14 @@
 import axios from 'axios';
 
+const defaultProdUrl = 'https://edwl-backend-1.onrender.com';
+const envApiUrl = import.meta.env.VITE_API_URL;
+
+export const API_BASE_URL = envApiUrl 
+    ? envApiUrl.replace(/\/api\/?$/, '') 
+    : (import.meta.env.MODE === 'production' ? defaultProdUrl : 'http://localhost:5000');
+
 const api = axios.create({
-    baseURL: import.meta.env.MODE === 'production'
-        ? 'https://edwl-backend-1.onrender.com/api'
-        : '/api',
+    baseURL: envApiUrl || (import.meta.env.MODE === 'production' ? `${defaultProdUrl}/api` : '/api'),
 });
 
 // Add a request interceptor to add the auth token to headers
@@ -33,9 +38,5 @@ api.interceptors.response.use(
         return Promise.reject(error);
     }
 );
-
-export const API_BASE_URL = import.meta.env.MODE === 'production'
-    ? 'https://edwl-backend-1.onrender.com'
-    : 'http://localhost:5000';
 
 export default api;

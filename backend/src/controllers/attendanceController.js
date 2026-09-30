@@ -38,3 +38,25 @@ exports.getMyShifts = async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch shift history' });
     }
 };
+
+exports.getActiveShift = async (req, res) => {
+    try {
+        const { contractId } = req.params;
+        const shift = await attendanceService.getActiveShift(contractId);
+        res.json({ isActive: !!shift, shift });
+    } catch (error) {
+        console.error('[Attendance Status Error]', error);
+        res.status(500).json({ error: 'Failed to fetch active shift status' });
+    }
+};
+
+exports.getContractShifts = async (req, res) => {
+    try {
+        const { contractId } = req.params;
+        const shifts = await attendanceService.getContractShifts(contractId);
+        res.json({ status: 'success', count: shifts.length, shifts });
+    } catch (error) {
+        console.error('[Contract Shifts Error]', error);
+        res.status(500).json({ error: 'Failed to fetch contract shifts' });
+    }
+};

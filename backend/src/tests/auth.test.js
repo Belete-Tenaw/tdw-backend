@@ -50,5 +50,42 @@ describe('Auth Endpoints', () => {
 
         expect(res.statusCode).toEqual(201);
         expect(res.body).toHaveProperty('token');
+        expect(res.body).toHaveProperty('user');
+        expect(res.body.user).toMatchObject({
+            id: '123',
+            name: 'Test User',
+            role: 'JOB_SEEKER'
+        });
+    });
+
+    it('should register a new employer and return user object in response', async () => {
+        prisma.employer.findFirst = jest.fn().mockResolvedValue(null);
+        prisma.employer.create = jest.fn().mockResolvedValue({
+            id: 'emp-456',
+            contactName: 'Abebe Kebede',
+            email: 'abebe@example.com',
+            role: 'EMPLOYER',
+            tier: 'FREE'
+        });
+
+        const res = await request(app)
+            .post('/api/auth/employer/register')
+            .send({
+                contactName: 'Abebe Kebede',
+                email: 'abebe@example.com',
+                phone: '0922334455',
+                password: 'password123',
+                employerType: 'HOUSEHOLD',
+                address: 'Bole, Addis Ababa'
+            });
+
+        expect(res.statusCode).toEqual(201);
+        expect(res.body).toHaveProperty('token');
+        expect(res.body).toHaveProperty('user');
+        expect(res.body.user).toMatchObject({
+            id: 'emp-456',
+            name: 'Abebe Kebede',
+            role: 'EMPLOYER'
+        });
     });
 });

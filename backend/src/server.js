@@ -270,6 +270,7 @@ app.use('/api/voice-copilot', require('./routes/voiceCopilot'));
 app.use('/api/payouts', require('./routes/payouts'));
 app.use('/api/guarantor', require('./routes/guarantor'));
 app.use('/api/household-checklist', require('./routes/householdChecklist'));
+app.use('/api/telegram', require('./routes/telegramRoutes'));
 
 // ================================
 // ❌ GLOBAL ERROR HANDLER

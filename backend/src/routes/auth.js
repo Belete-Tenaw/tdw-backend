@@ -40,4 +40,8 @@ router.get('/notifications', verifyToken, authController.getNotifications);
 router.put('/notifications/:id/read', verifyToken, authController.markNotificationRead);
 router.put('/notifications/read-all', verifyToken, authController.markAllNotificationsRead);
 
+// FCM Push Notification Token Registration
+// Called by frontend on every login to keep device token fresh
+router.patch('/fcm-token', verifyToken, authController.updateFcmToken);
+
 module.exports = router;
